@@ -9,7 +9,22 @@ Register dataset -> validate & version -> launch/ingest training run
 -> create next dataset version -> loop
 ```
 
-This repo is currently at **Phase 0: Foundation**. Agent feature work is intentionally blocked until Checkpoint 0 confirms the shared contract and scaffold.
+This repo is currently at **Phase 0: Planning and Foundation**. Agent feature work is intentionally blocked until Checkpoint 0 confirms the product direction, final menu, shared contract, and scaffold.
+
+## Product Navigation
+
+```text
+Research Data Command Center
+├── Home
+├── Datasets
+├── Runs
+├── Models & Evaluations
+├── Workspace
+├── Docs
+└── Settings
+```
+
+API and SDK references live under Docs. Dataset lineage belongs inside Datasets, run lineage inside Runs, and model lineage inside Models & Evaluations.
 
 ## V1 Stack
 
@@ -23,6 +38,7 @@ This repo is currently at **Phase 0: Foundation**. Agent feature work is intenti
 
 ## Phase 0 Contents
 
+- Master agent guidelines: `docs/ai_agent_build_guidelines.md`
 - Shared contract docs: `docs/shared_data_contract.md`
 - Checkpoint 0 brief: `docs/checkpoint_0.md`
 - Canonical keys/enums/table contracts: `shared/research_command_center_contract/`
@@ -34,7 +50,7 @@ This repo is currently at **Phase 0: Foundation**. Agent feature work is intenti
 ## Local Validation
 
 ```bash
-python -m pytest
+uv run --python 3.11 --with pytest python -m pytest
 ```
 
 Feature implementation begins only after the owner confirms Checkpoint 0.

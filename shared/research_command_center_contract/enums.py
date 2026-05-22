@@ -4,9 +4,9 @@ from enum import StrEnum
 
 
 class SourcePriority(StrEnum):
-    PUBLIC_REAL = "priority_1_public_real"
-    PIPELINE_REAL = "priority_2_pipeline_real"
-    CONSTRAINED_SYNTHETIC = "priority_3_constrained_synthetic"
+    PUBLIC_REAL = "PUBLIC_REAL"
+    GENERATED_REAL = "GENERATED_REAL"
+    SYNTHETIC_REALISTIC = "SYNTHETIC_REALISTIC"
 
 
 class RunStatus(StrEnum):

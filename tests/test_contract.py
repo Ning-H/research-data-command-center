@@ -3,6 +3,7 @@ from research_command_center_contract import (
     APP_METADATA_TABLES,
     CANONICAL_KEYS,
     RunStatus,
+    SourcePriority,
 )
 
 
@@ -36,6 +37,14 @@ def test_run_status_values_match_contract() -> None:
         "failed",
         "completed",
         "killed",
+    }
+
+
+def test_source_priority_values_match_project_guidelines() -> None:
+    assert {priority.value for priority in SourcePriority} == {
+        "PUBLIC_REAL",
+        "GENERATED_REAL",
+        "SYNTHETIC_REALISTIC",
     }
 
 
