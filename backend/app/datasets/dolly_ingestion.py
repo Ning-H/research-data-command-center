@@ -321,6 +321,76 @@ def ingest_dolly(storage_root: Path, limit: int | None = None, download: bool = 
         download_source(DOLLY_SOURCE_URL, raw_path)
 
     source_records = load_jsonl_records(raw_path, limit=limit)
+    return _write_dolly_outputs(
+        storage_root=storage_root,
+        source_records=source_records,
+        raw_path=raw_path,
+        dataset_version_id=dataset_version_id,
+        created_at=created_at,
+    )
+
+
+def ingest_dolly_records(
+    storage_root: Path,
+    source_records: list[dict[str, Any]],
+) -> IngestionResult:
+    created_at = utc_now_iso()
+    dataset_version_id = build_dataset_version_id()
+    raw_path = (
+        storage_root
+        / "raw"
+        / "datasets"
+        / DOLLY_DATASET_ID
+        / "databricks-dolly-15k"
+        / created_at[:10]
+        / "databricks-dolly-15k.jsonl"
+    )
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    raw_path.write_text(
+        "\n".join(json.dumps(record, ensure_ascii=True) for record in source_records),
+        encoding="utf-8",
+    )
+    return _write_dolly_outputs(
+        storage_root=storage_root,
+        source_records=source_records,
+        raw_path=raw_path,
+        dataset_version_id=dataset_version_id,
+        created_at=created_at,
+    )
+
+
+def register_duckdb_views(storage_root: Path, duckdb_path: Path) -> None:
+    duckdb_path.parent.mkdir(parents=True, exist_ok=True)
+    connection = duckdb.connect(str(duckdb_path))
+    try:
+        view_patterns = {
+            "dataset_records": storage_root / "parquet" / "dataset_records" / "**" / "*.parquet",
+            "dataset_schema_profiles": storage_root / "parquet" / "dataset_schema_profiles" / "**" / "*.parquet",
+            "dataset_quality_reports": storage_root / "parquet" / "dataset_quality_reports" / "**" / "*.parquet",
+            "dataset_duplicate_reports": storage_root / "parquet" / "dataset_duplicate_reports" / "**" / "*.parquet",
+            "dataset_pii_scan_results": storage_root / "parquet" / "dataset_pii_scan_results" / "**" / "*.parquet",
+            "dataset_token_statistics": storage_root / "parquet" / "dataset_token_statistics" / "**" / "*.parquet",
+            "dataset_lineage": storage_root / "parquet" / "dataset_lineage" / "**" / "*.parquet",
+        }
+        for view_name, pattern in view_patterns.items():
+            escaped_pattern = str(pattern).replace("'", "''")
+            connection.execute(
+                f"""
+                CREATE OR REPLACE VIEW {view_name} AS
+                SELECT * FROM read_parquet('{escaped_pattern}', hive_partitioning = true, union_by_name = true)
+                """
+            )
+    finally:
+        connection.close()
+
+
+def _write_dolly_outputs(
+    storage_root: Path,
+    source_records: list[dict[str, Any]],
+    raw_path: Path,
+    dataset_version_id: str,
+    created_at: str,
+) -> IngestionResult:
     normalized_records = [
         normalize_dolly_record(
             source_row=record,
@@ -388,31 +458,6 @@ def ingest_dolly(storage_root: Path, limit: int | None = None, download: bool = 
         parquet_uri=str(records_path),
         duckdb_path=str(duckdb_path),
     )
-
-
-def register_duckdb_views(storage_root: Path, duckdb_path: Path) -> None:
-    duckdb_path.parent.mkdir(parents=True, exist_ok=True)
-    connection = duckdb.connect(str(duckdb_path))
-    try:
-        view_patterns = {
-            "dataset_records": storage_root / "parquet" / "dataset_records" / "**" / "*.parquet",
-            "dataset_schema_profiles": storage_root / "parquet" / "dataset_schema_profiles" / "**" / "*.parquet",
-            "dataset_quality_reports": storage_root / "parquet" / "dataset_quality_reports" / "**" / "*.parquet",
-            "dataset_duplicate_reports": storage_root / "parquet" / "dataset_duplicate_reports" / "**" / "*.parquet",
-            "dataset_pii_scan_results": storage_root / "parquet" / "dataset_pii_scan_results" / "**" / "*.parquet",
-            "dataset_token_statistics": storage_root / "parquet" / "dataset_token_statistics" / "**" / "*.parquet",
-            "dataset_lineage": storage_root / "parquet" / "dataset_lineage" / "**" / "*.parquet",
-        }
-        for view_name, pattern in view_patterns.items():
-            escaped_pattern = str(pattern).replace("'", "''")
-            connection.execute(
-                f"""
-                CREATE OR REPLACE VIEW {view_name} AS
-                SELECT * FROM read_parquet('{escaped_pattern}', hive_partitioning = true, union_by_name = true)
-                """
-            )
-    finally:
-        connection.close()
 
 
 def main(argv: list[str] | None = None) -> int:

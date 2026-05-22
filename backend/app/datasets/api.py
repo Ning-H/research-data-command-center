@@ -1,0 +1,89 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Annotated, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.config import settings
+from app.datasets.repository import DatasetRepository
+
+router = APIRouter(prefix="/datasets", tags=["datasets"])
+
+
+def get_dataset_repository() -> DatasetRepository:
+    return DatasetRepository(duckdb_path=Path(settings.duckdb_path), storage_root=Path("."))
+
+
+@router.get("")
+def list_datasets(repository: Annotated[DatasetRepository, Depends(get_dataset_repository)]) -> dict[str, Any]:
+    return {"items": repository.list_datasets()}
+
+
+@router.get("/{dataset_id}")
+def get_dataset(
+    dataset_id: str,
+    repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
+) -> dict[str, Any]:
+    dataset = repository.get_dataset(dataset_id)
+    if dataset is None:
+        raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_id}")
+    return dataset
+
+
+@router.get("/{dataset_id}/versions/{dataset_version_id}/records")
+def list_dataset_records(
+    dataset_id: str,
+    dataset_version_id: str,
+    repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 25,
+) -> dict[str, Any]:
+    return {
+        "items": repository.list_records(
+            dataset_id=dataset_id,
+            dataset_version_id=dataset_version_id,
+            limit=limit,
+        )
+    }
+
+
+@router.get("/{dataset_id}/versions/{dataset_version_id}/quality")
+def get_dataset_quality(
+    dataset_id: str,
+    dataset_version_id: str,
+    repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
+) -> dict[str, Any]:
+    return {
+        "items": repository.get_quality_metrics(
+            dataset_id=dataset_id,
+            dataset_version_id=dataset_version_id,
+        )
+    }
+
+
+@router.get("/{dataset_id}/versions/{dataset_version_id}/schema")
+def get_dataset_schema(
+    dataset_id: str,
+    dataset_version_id: str,
+    repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
+) -> dict[str, Any]:
+    return {
+        "items": repository.get_schema_profile(
+            dataset_id=dataset_id,
+            dataset_version_id=dataset_version_id,
+        )
+    }
+
+
+@router.get("/{dataset_id}/versions/{dataset_version_id}/lineage")
+def get_dataset_lineage(
+    dataset_id: str,
+    dataset_version_id: str,
+    repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
+) -> dict[str, Any]:
+    return {
+        "items": repository.get_lineage(
+            dataset_id=dataset_id,
+            dataset_version_id=dataset_version_id,
+        )
+    }

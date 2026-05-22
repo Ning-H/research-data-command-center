@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.datasets.api import router as datasets_router
 from research_command_center_contract import ANALYTICAL_TABLES, APP_METADATA_TABLES, CANONICAL_KEYS
 
 app = FastAPI(
@@ -7,6 +8,8 @@ app = FastAPI(
     version="0.1.0",
     description="Phase 0 foundation API exposing the shared contract.",
 )
+
+app.include_router(datasets_router)
 
 
 @app.get("/health")
