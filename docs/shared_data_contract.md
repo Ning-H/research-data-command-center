@@ -105,6 +105,32 @@ The table definitions below intentionally define shared boundaries, not every fu
 - `created_at`
 - `created_by_user_id`
 
+#### `datasets`
+
+- `dataset_id`
+- `name`
+- `description`
+- `category`
+- `default_task_type`
+- `source_label`
+- `owner_user_id`
+- `created_at`
+- `updated_at`
+
+#### `dataset_ingestion_jobs`
+
+- `dataset_ingestion_job_id`
+- `dataset_id`
+- `source_dataset_name`
+- `source_config_json`
+- `status`
+- `started_at`
+- `ended_at`
+- `records_seen`
+- `records_written`
+- `error_message`
+- `created_by_user_id`
+
 #### `run_configs`
 
 - `run_config_id`
@@ -234,6 +260,84 @@ Long-format time-series keyed by `run_id`, `node_id`, and optional `gpu_id`.
 - `metric_name`
 - `metric_value`
 - `source_priority`
+
+#### `dataset_records`
+
+- `record_id`
+- `dataset_id`
+- `dataset_version_id`
+- `source_dataset_name`
+- `source_split`
+- `source_row_id`
+- `category`
+- `task_type`
+- `input_text`
+- `instruction`
+- `context`
+- `question`
+- `chosen_text`
+- `rejected_text`
+- `target_text`
+- `response_text`
+- `prompt_messages_json`
+- `metadata_json`
+- `content_hash`
+- `source_label`
+- `created_at`
+
+#### `dataset_schema_profiles`
+
+- `dataset_version_id`
+- `field_name`
+- `field_type`
+- `non_null_count`
+- `null_count`
+- `empty_count`
+- `distinct_count`
+- `min_length`
+- `max_length`
+- `mean_length`
+- `example_values_json`
+- `created_at`
+
+#### `dataset_duplicate_reports`
+
+- `dataset_version_id`
+- `content_hash`
+- `duplicate_count`
+- `record_ids_json`
+- `created_at`
+
+#### `dataset_pii_scan_results`
+
+- `dataset_version_id`
+- `record_id`
+- `pii_type`
+- `match_count`
+- `scanner_name`
+- `scanner_version`
+- `created_at`
+
+#### `dataset_token_statistics`
+
+- `dataset_version_id`
+- `record_id`
+- `tokenizer_name`
+- `input_token_count`
+- `target_token_count`
+- `total_token_count`
+- `created_at`
+
+#### `dataset_lineage`
+
+- `dataset_id`
+- `source_dataset_version_id`
+- `target_dataset_version_id`
+- `lineage_event_type`
+- `transform_name`
+- `transform_config_uri`
+- `created_at`
+- `created_by_user_id`
 
 #### `dataset_usage`
 

@@ -57,6 +57,21 @@ def test_metrics_tables_are_long_format() -> None:
         assert tables[table_name].is_time_series
 
 
+def test_dataset_agent_tables_are_registered_after_checkpoint_2_approval() -> None:
+    metadata_tables = {table.name for table in APP_METADATA_TABLES}
+    analytical_tables = {table.name for table in ANALYTICAL_TABLES}
+
+    assert {"datasets", "dataset_ingestion_jobs"}.issubset(metadata_tables)
+    assert {
+        "dataset_records",
+        "dataset_schema_profiles",
+        "dataset_duplicate_reports",
+        "dataset_pii_scan_results",
+        "dataset_token_statistics",
+        "dataset_lineage",
+    }.issubset(analytical_tables)
+
+
 def test_core_lineage_tables_keep_foreign_keys_explicit() -> None:
     tables = {table.name: table for table in (*APP_METADATA_TABLES, *ANALYTICAL_TABLES)}
 

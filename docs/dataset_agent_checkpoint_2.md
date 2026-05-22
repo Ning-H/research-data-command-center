@@ -1,8 +1,8 @@
 # Dataset Agent Checkpoint 2: Data Model and Storage Plan
 
-Status: **owner review required before Dataset Agent implementation**
+Status: **approved and implemented as the Dolly-first walking skeleton**
 
-This checkpoint turns the approved Dataset Checkpoint 1 direction into a concrete storage and schema plan. It proposes contract amendments, but does not implement them until approved.
+This checkpoint turns the approved Dataset Checkpoint 1 direction into a concrete storage and schema plan. The approved contract amendments and Dolly-first walking skeleton are implemented in the repo.
 
 ## What The Dataset Agent Plans To Do Next
 
