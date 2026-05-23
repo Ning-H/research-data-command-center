@@ -251,6 +251,14 @@ tr:last-child td {
   color: var(--text);
 }
 
+.action-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .two-column {
   display: grid;
   gap: 16px;

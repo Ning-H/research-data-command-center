@@ -139,6 +139,27 @@ metrics_snapshot
 created_at
 ```
 
+Every `checkpoint_id` belongs to exactly one `run_id`. This is required because
+the run carries the dataset, config, base model, trainer, owner, and execution
+context needed to interpret the checkpoint.
+
+The checkpoint metadata is stored as a separate analytical table so researchers
+can search and rank checkpoints across runs:
+
+```text
+GET /checkpoints?dataset_id=1&dataset_version_id=1&framework=pytorch&trainer=train_registered_torch_classifier&ranking_metric=train.accuracy&direction=desc
+```
+
+The actual artifact file may stay under a run-owned object-store path:
+
+```text
+storage/object_store/training_jobs/run_id=7/torch_checkpoint_epoch_8_step_56.pt
+```
+
+That layout is acceptable because the checkpoint file was produced by that run.
+Cross-run discovery must use the checkpoint metadata table, not filesystem
+walking.
+
 A checkpoint can later be promoted to a `model_version`. Promotion is a metadata action in this platform; it links:
 
 ```text

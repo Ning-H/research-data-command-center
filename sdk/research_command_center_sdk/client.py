@@ -56,6 +56,26 @@ class ResearchCommandCenterClient:
     def get_run_checkpoints(self, run_id: str | int) -> dict[str, Any]:
         return self._get(f"/runs/{run_id}/checkpoints")
 
+    def search_checkpoints(
+        self,
+        dataset_id: str | int | None = None,
+        dataset_version_id: str | int | None = None,
+        framework: str | None = None,
+        trainer: str | None = None,
+        ranking_metric: str = "train.accuracy",
+        direction: str = "desc",
+    ) -> dict[str, Any]:
+        params = {
+            "dataset_id": dataset_id,
+            "dataset_version_id": dataset_version_id,
+            "framework": framework,
+            "trainer": trainer,
+            "ranking_metric": ranking_metric,
+            "direction": direction,
+        }
+        query = str(httpx.QueryParams({key: value for key, value in params.items() if value is not None}))
+        return self._get(f"/checkpoints?{query}")
+
     def append_run_checkpoints(
         self,
         run_id: str | int,

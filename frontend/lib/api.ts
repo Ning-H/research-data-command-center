@@ -153,6 +153,26 @@ export type RunCheckpoint = {
   created_at: string;
 };
 
+export type CheckpointSearchResult = RunCheckpoint & {
+  rank: number;
+  is_best_for_filter: boolean;
+  run_name: string;
+  experiment_name: string;
+  dataset_id: number;
+  run_config_id: number;
+  model_family: string;
+  framework: string;
+  trainer: string;
+  device: string;
+  run_status: string;
+  source_priority: string;
+  training_environment: string;
+  ingest_source: string;
+  ranking_metric: string;
+  ranking_value: number | null;
+  promotion_status: string;
+};
+
 export type RunLineageEdge = {
   lineage_step: string;
   source_type: string;
@@ -214,6 +234,17 @@ export async function listRuns(): Promise<RunSummary[]> {
 
 export async function getRun(runId: string): Promise<RunDetail> {
   return getJson<RunDetail>(`/runs/${runId}`);
+}
+
+export async function searchCheckpoints(params: Record<string, string | number | undefined>): Promise<CheckpointSearchResult[]> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  const payload = await getJson<{ items: CheckpointSearchResult[] }>(`/checkpoints?${query.toString()}`);
+  return payload.items;
 }
 
 async function getJson<T>(path: string): Promise<T> {

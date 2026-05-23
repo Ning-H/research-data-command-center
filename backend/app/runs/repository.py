@@ -175,6 +175,88 @@ class RunRepository:
             for row in rows
         ]
 
+    def search_checkpoints(
+        self,
+        dataset_id: int | None = None,
+        dataset_version_id: int | None = None,
+        framework: str | None = None,
+        trainer: str | None = None,
+        run_status: str | None = "completed",
+        ranking_metric: str = "train.accuracy",
+        direction: str = "desc",
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        if not self._has_table("checkpoints") or not self._has_table("training_runs"):
+            return []
+        filters: list[str] = []
+        params: list[Any] = []
+        if dataset_id is not None:
+            filters.append("tr.dataset_id = ?")
+            params.append(int(dataset_id))
+        if dataset_version_id is not None:
+            filters.append("tr.dataset_version_id = ?")
+            params.append(int(dataset_version_id))
+        if run_status:
+            filters.append("tr.status = ?")
+            params.append(run_status)
+        where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+        rows = self._query(
+            f"""
+            SELECT
+                cp.checkpoint_id,
+                cp.run_id,
+                tr.run_name,
+                tr.experiment_name,
+                tr.dataset_id,
+                cp.dataset_version_id,
+                tr.run_config_id,
+                tr.model_family,
+                tr.status AS run_status,
+                tr.source_priority,
+                tr.training_environment,
+                tr.ingest_source,
+                cp.step,
+                cp.status,
+                cp.artifact_uri,
+                cp.metrics_snapshot_json,
+                cp.created_at,
+                rc.config_json
+            FROM checkpoints cp
+            JOIN training_runs tr ON cp.run_id = tr.run_id
+            LEFT JOIN run_configs rc ON tr.run_config_id = rc.run_config_id
+            {where_clause}
+            ORDER BY tr.started_at DESC, cp.step DESC
+            """,
+            params,
+        )
+        checkpoints = [
+            _checkpoint_search_row(
+                row=row,
+                ranking_metric=ranking_metric,
+            )
+            for row in rows
+        ]
+        if framework:
+            checkpoints = [
+                checkpoint
+                for checkpoint in checkpoints
+                if str(checkpoint["run_config"].get("framework", "")).lower() == framework.lower()
+            ]
+        if trainer:
+            checkpoints = [
+                checkpoint
+                for checkpoint in checkpoints
+                if trainer.lower() in str(checkpoint["run_config"].get("trainer", "")).lower()
+            ]
+        checkpoints.sort(
+            key=lambda checkpoint: _checkpoint_rank_key(checkpoint, direction),
+        )
+        for index, checkpoint in enumerate(checkpoints, start=1):
+            checkpoint["rank"] = index
+            checkpoint["is_best_for_filter"] = index == 1
+        return checkpoints[offset : offset + limit]
+
     def get_lineage(self, run_id: str | int) -> list[dict[str, Any]]:
         run = self._run_row(run_id)
         if not run:
@@ -330,3 +412,48 @@ def _hardware_note(by_metric: dict[str, list[float]]) -> str:
     if by_metric.get("process.memory_rss_mb"):
         return "Local process CPU and memory metrics were submitted; GPU utilization was not available in this run."
     return "No compute telemetry was submitted for this run."
+
+
+def _checkpoint_search_row(row: dict[str, Any], ranking_metric: str) -> dict[str, Any]:
+    metrics_snapshot = json.loads(row["metrics_snapshot_json"]) if row.get("metrics_snapshot_json") else {}
+    run_config = json.loads(row["config_json"]) if row.get("config_json") else {}
+    ranking_value = metrics_snapshot.get(ranking_metric)
+    if ranking_value is not None:
+        ranking_value = float(ranking_value)
+    return {
+        "checkpoint_id": row["checkpoint_id"],
+        "run_id": row["run_id"],
+        "run_name": row["run_name"],
+        "experiment_name": row["experiment_name"],
+        "dataset_id": row["dataset_id"],
+        "dataset_version_id": row["dataset_version_id"],
+        "run_config_id": row["run_config_id"],
+        "model_family": row["model_family"],
+        "framework": run_config.get("framework", "not provided"),
+        "trainer": run_config.get("trainer", "not provided"),
+        "device": run_config.get("device", "not provided"),
+        "run_status": row["run_status"],
+        "source_priority": row["source_priority"],
+        "training_environment": row["training_environment"],
+        "ingest_source": row["ingest_source"],
+        "step": row["step"],
+        "status": row["status"],
+        "artifact_uri": row["artifact_uri"],
+        "checkpoint_uri": row["artifact_uri"],
+        "metrics_snapshot": metrics_snapshot,
+        "ranking_metric": ranking_metric,
+        "ranking_value": ranking_value,
+        "created_at": row["created_at"],
+        "run_config": run_config,
+        "promotion_status": "not_promoted_yet",
+    }
+
+
+def _checkpoint_rank_key(checkpoint: dict[str, Any], direction: str) -> tuple[bool, float, float]:
+    ranking_value = checkpoint["ranking_value"]
+    missing = ranking_value is None
+    normalized_value = float(ranking_value or 0.0)
+    if direction != "asc":
+        normalized_value = -normalized_value
+    loss_tiebreak = float(checkpoint["metrics_snapshot"].get("train.loss", 0.0))
+    return (missing, normalized_value, loss_tiebreak)

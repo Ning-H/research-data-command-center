@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -17,6 +17,14 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
   } catch {
     notFound();
   }
+  const checkpointSearchHref = `/runs/checkpoints?${new URLSearchParams({
+    dataset_id: String(run.dataset_id),
+    dataset_version_id: String(run.dataset_version_id),
+    framework: String(run.run_config.config.framework ?? ""),
+    trainer: String(run.run_config.config.trainer ?? ""),
+    ranking_metric: "train.accuracy",
+    direction: "desc",
+  }).toString()}`;
 
   return (
     <section className="page">
@@ -133,6 +141,10 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
               Checkpoint files were saved by the training job; this platform stores their URI,
               step, metrics snapshot, and promotion-ready lineage.
             </p>
+            <Link className="button secondary" href={checkpointSearchHref}>
+              Compare same dataset / trainer
+              <ArrowRight aria-hidden="true" size={16} />
+            </Link>
           </div>
           <div className="record-list">
             {run.checkpoints.map((checkpoint) => (

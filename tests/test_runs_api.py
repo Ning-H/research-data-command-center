@@ -142,5 +142,21 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
         assert detail["metric_summary"]["final_loss"] == 1.2
         assert detail["compute_summary"]["avg_process_memory_mb"] == 120.0
         assert detail["checkpoints"][0]["checkpoint_id"] == 1001
+
+        search_response = client.get(
+            "/checkpoints",
+            params={
+                "dataset_id": 1,
+                "dataset_version_id": 1,
+                "ranking_metric": "train.loss",
+                "direction": "asc",
+            },
+        )
+        assert search_response.status_code == 200
+        checkpoints = search_response.json()["items"]
+        assert checkpoints[0]["checkpoint_id"] == 1001
+        assert checkpoints[0]["run_id"] == run_id
+        assert checkpoints[0]["is_best_for_filter"] is True
+        assert checkpoints[0]["metrics_snapshot"]["train.loss"] == 1.2
     finally:
         app.dependency_overrides.clear()

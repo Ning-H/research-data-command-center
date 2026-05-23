@@ -23,7 +23,13 @@ export default async function RunsPage() {
             checkpoint metadata, and configs here for normalization, lineage, and analysis.
           </p>
         </div>
-        <span className="badge">API / SDK ingest</span>
+        <div className="action-row">
+          <Link className="button secondary" href="/runs/checkpoints">
+            Checkpoints
+            <ArrowRight aria-hidden="true" size={16} />
+          </Link>
+          <span className="badge">API / SDK ingest</span>
+        </div>
       </div>
 
       <div className="summary-grid">

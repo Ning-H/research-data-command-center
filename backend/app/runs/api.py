@@ -16,6 +16,7 @@ from app.runs.lifecycle import (
 from app.runs.repository import RunRepository
 
 router = APIRouter(prefix="/runs", tags=["runs"])
+checkpoints_router = APIRouter(prefix="/checkpoints", tags=["checkpoints"])
 
 
 def get_run_repository() -> RunRepository:
@@ -169,3 +170,44 @@ def complete_training_run(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"run_id": result.run_id, "status": result.status, "ended_at": result.ended_at}
+
+
+@checkpoints_router.get("")
+def search_checkpoints(
+    repository: Annotated[RunRepository, Depends(get_run_repository)],
+    dataset_id: int | None = None,
+    dataset_version_id: int | None = None,
+    framework: str | None = None,
+    trainer: str | None = None,
+    run_status: str | None = "completed",
+    ranking_metric: str = "train.accuracy",
+    direction: str = "desc",
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> dict[str, Any]:
+    if direction not in {"asc", "desc"}:
+        raise HTTPException(status_code=400, detail="direction must be asc or desc")
+    return {
+        "items": repository.search_checkpoints(
+            dataset_id=dataset_id,
+            dataset_version_id=dataset_version_id,
+            framework=framework,
+            trainer=trainer,
+            run_status=run_status,
+            ranking_metric=ranking_metric,
+            direction=direction,
+            limit=limit,
+            offset=offset,
+        ),
+        "filters": {
+            "dataset_id": dataset_id,
+            "dataset_version_id": dataset_version_id,
+            "framework": framework,
+            "trainer": trainer,
+            "run_status": run_status,
+            "ranking_metric": ranking_metric,
+            "direction": direction,
+        },
+        "limit": limit,
+        "offset": offset,
+    }
