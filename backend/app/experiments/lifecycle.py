@@ -30,8 +30,6 @@ STRING_FIELDS = {
     "experiment_type",
     "status",
     "owner_name",
-    "current_focus",
-    "data_strategy",
     "evaluation_plan",
     "decision_notes",
     "input_source",
@@ -205,8 +203,6 @@ def _normalize_experiment_row(payload: dict[str, Any]) -> dict[str, Any]:
         "experiment_type": str(payload.get("experiment_type") or "").strip(),
         "status": status,
         "owner_name": str(payload.get("owner_name") or "").strip(),
-        "current_focus": str(payload.get("current_focus") or "").strip(),
-        "data_strategy": str(payload.get("data_strategy") or "").strip(),
         "evaluation_plan": str(payload.get("evaluation_plan") or "").strip(),
         "tags_json": json.dumps(_string_list(payload, "tags"), sort_keys=True),
         "variants_json": json.dumps(_variant_list(payload), sort_keys=True),
@@ -238,8 +234,10 @@ def _variant_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "variant_id": int(variant.get("variant_id") or index),
                 "variant_name": str(variant.get("variant_name") or variant.get("name") or "").strip(),
+                "variant_type": str(
+                    variant.get("variant_type") or ("control" if index == 1 else "test")
+                ).strip(),
                 "description": str(variant.get("description") or "").strip(),
-                "data_recipe": str(variant.get("data_recipe") or "").strip(),
             }
         )
     return normalized

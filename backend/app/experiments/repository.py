@@ -9,6 +9,26 @@ import duckdb
 from app.experiments.lifecycle import register_experiment_duckdb_view
 
 
+EXPERIMENT_RESPONSE_FIELDS = {
+    "experiment_id",
+    "program_id",
+    "experiment_name",
+    "experiment_description",
+    "research_question",
+    "hypothesis",
+    "experiment_type",
+    "status",
+    "owner_name",
+    "evaluation_plan",
+    "decision_notes",
+    "input_source",
+    "created_at",
+    "updated_at",
+    "created_by_user_id",
+    "updated_by_user_id",
+}
+
+
 class ExperimentRepository:
     def __init__(self, duckdb_path: Path, storage_root: Path) -> None:
         self.duckdb_path = duckdb_path
@@ -104,7 +124,11 @@ class ExperimentRepository:
 
 
 def _experiment_row(row: dict[str, Any]) -> dict[str, Any]:
-    experiment = {key: value for key, value in row.items() if not key.endswith("_json")}
+    experiment = {
+        key: value
+        for key, value in row.items()
+        if key in EXPERIMENT_RESPONSE_FIELDS and not key.endswith("_json")
+    }
     return {
         **experiment,
         "tags": _json_list(row.get("tags_json")),
@@ -130,8 +154,6 @@ def _experiment_search_text(experiment: dict[str, Any]) -> str:
         experiment.get("research_question"),
         experiment.get("hypothesis"),
         experiment.get("experiment_type"),
-        experiment.get("current_focus"),
-        experiment.get("data_strategy"),
         experiment.get("evaluation_plan"),
         experiment.get("decision_notes"),
         " ".join(str(tag) for tag in experiment.get("tags", [])),

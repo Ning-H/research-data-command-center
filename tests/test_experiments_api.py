@@ -44,23 +44,21 @@ def test_experiments_can_be_registered_under_research_programs(tmp_path: Path) -
                 "hypothesis": (
                     "Structured exemplars and corrected failures improve long-form study guides."
                 ),
-                "experiment_type": "data_recipe_ablation",
+                "experiment_type": "study_material_structure_comparison",
                 "status": "planning",
                 "owner_name": "Lena Keys",
-                "current_focus": "Prepare data assets and rubric-labeled eval cases.",
-                "data_strategy": "Use public coding/QA records plus generated study-guide examples.",
                 "evaluation_plan": "Score coverage, depth, example relevance, and factual accuracy.",
                 "tags": ["python_algorithms", "study_material"],
                 "variants": [
                     {
                         "variant_name": "baseline_direct_answer",
+                        "variant_type": "control",
                         "description": "Use existing instruction-tuning data only.",
-                        "data_recipe": "100% baseline instruction data",
                     },
                     {
                         "variant_name": "outline_first_guides",
+                        "variant_type": "test",
                         "description": "Add structured algorithm guide exemplars.",
-                        "data_recipe": "80% baseline + 20% outline-first study-guide data",
                     },
                 ],
                 "linked_datasets": [{"dataset_id": 1, "dataset_version_id": 1}],
@@ -80,6 +78,10 @@ def test_experiments_can_be_registered_under_research_programs(tmp_path: Path) -
         assert detail["research_question"].startswith("Does outline-first")
         assert detail["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
         assert detail["variants"][1]["variant_name"] == "outline_first_guides"
+        assert detail["variants"][0]["variant_type"] == "control"
+        assert "data_recipe" not in detail["variants"][0]
+        assert "current_focus" not in detail
+        assert "data_strategy" not in detail
         assert detail["ui_workflow"]["can_update_from_ui"] is True
         assert "attach_training_runs" in detail["ui_workflow"]["supported_actions"]
         assert all(not key.endswith("_json") for key in detail)
@@ -88,7 +90,7 @@ def test_experiments_can_be_registered_under_research_programs(tmp_path: Path) -
         assert list_response.status_code == 200
         assert list_response.json()["items"][0]["experiment_id"] == 1
 
-        search_response = client.get("/experiments", params={"q": "rubric-labeled"})
+        search_response = client.get("/experiments", params={"q": "factual accuracy"})
         assert search_response.status_code == 200
         assert search_response.json()["items"][0]["experiment_id"] == 1
 

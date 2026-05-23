@@ -61,8 +61,6 @@ APP_METADATA_TABLES: tuple[TableContract, ...] = (
             "experiment_type",
             "status",
             "owner_name",
-            "current_focus",
-            "data_strategy",
             "evaluation_plan",
             "tags_json",
             "variants_json",
