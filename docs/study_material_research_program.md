@@ -2,7 +2,7 @@
 
 Status: active seed research program
 
-## Origin
+## Initiating Context
 
 This program starts from a real product experience: a user asked a frontier model
 to generate study material for Python algorithms. The task should be standard:

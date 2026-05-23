@@ -18,6 +18,7 @@ JSON_LIST_FIELDS = {
     "tags",
     "linked_dataset_ids",
     "linked_experiment_ids",
+    "linked_run_ids",
 }
 
 STRING_FIELDS = {
@@ -25,10 +26,10 @@ STRING_FIELDS = {
     "short_name",
     "program_description",
     "problem_statement",
-    "origin_story",
+    "initiating_context",
     "research_goal",
     "hypothesis",
-    "target_outcome",
+    "research_objectives",
     "status",
     "research_area",
     "current_focus",
@@ -171,16 +172,17 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
     tags = _string_list(payload, "tags")
     linked_dataset_ids = [int(value) for value in _list_value(payload, "linked_dataset_ids")]
     linked_experiment_ids = [int(value) for value in _list_value(payload, "linked_experiment_ids")]
+    linked_run_ids = [int(value) for value in _list_value(payload, "linked_run_ids")]
     return {
         "program_id": int(payload["program_id"]),
         "program_name": program_name,
         "short_name": str(payload.get("short_name") or program_name).strip(),
         "program_description": str(payload.get("program_description") or "").strip(),
         "problem_statement": str(payload.get("problem_statement") or "").strip(),
-        "origin_story": str(payload.get("origin_story") or "").strip(),
+        "initiating_context": _text_value(payload, "initiating_context", "origin_story"),
         "research_goal": str(payload.get("research_goal") or "").strip(),
         "hypothesis": str(payload.get("hypothesis") or "").strip(),
-        "target_outcome": str(payload.get("target_outcome") or "").strip(),
+        "research_objectives": _text_value(payload, "research_objectives", "target_outcome"),
         "status": status,
         "research_area": str(payload.get("research_area") or "").strip(),
         "current_focus": str(payload.get("current_focus") or "").strip(),
@@ -190,6 +192,7 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
         "tags_json": json.dumps(tags, sort_keys=True),
         "linked_dataset_ids_json": json.dumps(linked_dataset_ids, sort_keys=True),
         "linked_experiment_ids_json": json.dumps(linked_experiment_ids, sort_keys=True),
+        "linked_run_ids_json": json.dumps(linked_run_ids, sort_keys=True),
         "decision_notes": str(payload.get("decision_notes") or "").strip(),
         "input_source": str(payload.get("input_source") or "ui").strip(),
         "created_at": str(payload["created_at"]),
@@ -201,6 +204,10 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
 
 def _string_list(payload: dict[str, Any], key: str) -> list[str]:
     return [str(value).strip() for value in _list_value(payload, key) if str(value).strip()]
+
+
+def _text_value(payload: dict[str, Any], key: str, legacy_key: str) -> str:
+    return str(payload.get(key) or payload.get(legacy_key) or "").strip()
 
 
 def _list_value(payload: dict[str, Any], key: str) -> list[Any]:

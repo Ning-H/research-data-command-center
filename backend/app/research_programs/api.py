@@ -29,6 +29,8 @@ def list_research_programs(
     repository: Annotated[ResearchProgramRepository, Depends(get_research_program_repository)],
     status: str | None = None,
     researcher_name: str | None = None,
+    tag: str | None = None,
+    q: str | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> dict[str, Any]:
@@ -36,12 +38,14 @@ def list_research_programs(
         "items": repository.list_programs(
             status=status,
             researcher_name=researcher_name,
+            tag=tag,
+            q=q,
             limit=limit,
             offset=offset,
         ),
         "limit": limit,
         "offset": offset,
-        "filters": {"status": status, "researcher_name": researcher_name},
+        "filters": {"status": status, "researcher_name": researcher_name, "tag": tag, "q": q},
     }
 
 

@@ -19,6 +19,8 @@ class ResearchProgramRepository:
         self,
         status: str | None = None,
         researcher_name: str | None = None,
+        tag: str | None = None,
+        q: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ) -> list[dict[str, Any]]:
@@ -48,6 +50,20 @@ class ResearchProgramRepository:
                 if researcher_name in program.get("researcher_names", [])
                 or researcher_name == program.get("owner_name")
             ]
+        if tag:
+            normalized_tag = tag.lower()
+            programs = [
+                program
+                for program in programs
+                if normalized_tag in {str(item).lower() for item in program.get("tags", [])}
+            ]
+        if q:
+            normalized_query = q.lower()
+            programs = [
+                program
+                for program in programs
+                if normalized_query in _program_search_text(program)
+            ]
         return programs
 
     def get_program(self, program_id: int) -> dict[str, Any] | None:
@@ -67,6 +83,7 @@ class ResearchProgramRepository:
                     "change_researchers",
                     "attach_data_assets",
                     "attach_experiments",
+                    "attach_training_runs",
                     "append_decision_notes",
                 ],
             },
@@ -99,6 +116,7 @@ def _program_row(row: dict[str, Any]) -> dict[str, Any]:
         "tags": _json_list(row.get("tags_json")),
         "linked_dataset_ids": _json_list(row.get("linked_dataset_ids_json")),
         "linked_experiment_ids": _json_list(row.get("linked_experiment_ids_json")),
+        "linked_run_ids": _json_list(row.get("linked_run_ids_json")),
     }
 
 
@@ -108,3 +126,21 @@ def _json_list(value: Any) -> list[Any]:
     if isinstance(value, list):
         return value
     return list(json.loads(str(value)))
+
+
+def _program_search_text(program: dict[str, Any]) -> str:
+    values = [
+        program.get("program_name"),
+        program.get("short_name"),
+        program.get("program_description"),
+        program.get("problem_statement"),
+        program.get("initiating_context"),
+        program.get("research_goal"),
+        program.get("hypothesis"),
+        program.get("research_objectives"),
+        program.get("research_area"),
+        program.get("current_focus"),
+        program.get("decision_notes"),
+        " ".join(str(tag) for tag in program.get("tags", [])),
+    ]
+    return " ".join(str(value or "").lower() for value in values)
