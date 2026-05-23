@@ -50,8 +50,9 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           <p className="metric-value compact">{dataset.data_purpose}</p>
         </div>
         <div className="metric">
-          <p className="metric-label">Quality</p>
-          <p className="metric-value">{dataset.quality_status}</p>
+          <p className="metric-label">Quality Score</p>
+          <p className="metric-value">{dataset.quality_score}/100</p>
+          <p className="metric-label">{dataset.quality_label}</p>
         </div>
       </div>
 
@@ -73,7 +74,8 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           <Metadata label="record_count" value={dataset.record_count.toLocaleString()} />
           <Metadata label="source_label" value={dataset.source_label} />
           <Metadata label="mean_tokens" value={formatMetric(metrics["tokens.mean"])} />
-          <Metadata label="quality_status" value={dataset.quality_status} />
+          <Metadata label="quality_score" value={`${dataset.quality_score}/100`} />
+          <Metadata label="quality_label" value={dataset.quality_label} />
         </div>
         <div className="description-box">
           <span>dataset_description</span>
@@ -113,10 +115,11 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           </div>
           <div className="quality-note">
             <div>
-              <span className={dataset.quality_summary.status === "passed" ? "badge" : "badge warning"}>
-                {dataset.quality_summary.status}
+              <span className={qualityBadgeClass(dataset.quality_summary.score)}>
+                {dataset.quality_summary.score}/100 · {dataset.quality_summary.score_label}
               </span>
             </div>
+            <p>{dataset.quality_summary.score_explanation}</p>
             <p>{dataset.quality_summary.null_value_policy}</p>
             <p>
               Framework: {dataset.quality_summary.framework}
@@ -132,7 +135,7 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
               <div className="quality-check" key={check.metric_name}>
                 <div>
                   <strong>{check.name}</strong>
-                  <span className={check.status === "passed" ? "badge" : check.status === "warning" ? "badge warning" : "badge neutral"}>
+                  <span className={check.status === "ok" ? "badge" : check.status === "review" ? "badge warning" : "badge neutral"}>
                     {check.status}
                   </span>
                 </div>
@@ -142,6 +145,26 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
                 </div>
               </div>
             ))}
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Score component</th>
+                  <th>Weight</th>
+                  <th>Meaning</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dataset.quality_summary.score_components.map((component) => (
+                  <tr key={component.name}>
+                    <td>{component.name}</td>
+                    <td>{component.weight}</td>
+                    <td>{component.description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
           <div className="table-wrap">
             <table>
@@ -257,4 +280,14 @@ function formatMetric(value: number | undefined) {
 
 function formatDate(value: string) {
   return value.slice(0, 10);
+}
+
+function qualityBadgeClass(score: number) {
+  if (score >= 90) {
+    return "badge";
+  }
+  if (score >= 60) {
+    return "badge warning";
+  }
+  return "badge danger";
 }

@@ -6,6 +6,9 @@ import { listDatasets } from "../../lib/api";
 export default async function DatasetsPage() {
   const datasets = await listDatasets();
   const totalRecords = datasets.reduce((sum, dataset) => sum + dataset.record_count, 0);
+  const averageQualityScore = datasets.length
+    ? Math.round(datasets.reduce((sum, dataset) => sum + dataset.quality_score, 0) / datasets.length)
+    : 0;
 
   return (
     <section className="page">
@@ -34,10 +37,8 @@ export default async function DatasetsPage() {
           <p className="metric-value">PUBLIC_REAL</p>
         </div>
         <div className="metric">
-          <p className="metric-label">Quality gate</p>
-          <p className="metric-value">
-            {datasets.every((dataset) => dataset.quality_status === "passed") ? "Passed" : "Review"}
-          </p>
+          <p className="metric-label">Avg quality score</p>
+          <p className="metric-value">{averageQualityScore}/100</p>
         </div>
       </div>
 
@@ -66,8 +67,8 @@ export default async function DatasetsPage() {
                 <td>v{dataset.dataset_version_id}</td>
                 <td>{dataset.record_count.toLocaleString()}</td>
                 <td>
-                  <span className={dataset.quality_status === "passed" ? "badge" : "badge warning"}>
-                    {dataset.quality_status}
+                  <span className={qualityBadgeClass(dataset.quality_score)}>
+                    {dataset.quality_score}/100 · {dataset.quality_label}
                   </span>
                 </td>
                 <td>{dataset.source_label}</td>
@@ -85,4 +86,14 @@ export default async function DatasetsPage() {
       </div>
     </section>
   );
+}
+
+function qualityBadgeClass(score: number) {
+  if (score >= 90) {
+    return "badge";
+  }
+  if (score >= 60) {
+    return "badge warning";
+  }
+  return "badge danger";
 }

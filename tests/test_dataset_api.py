@@ -33,6 +33,8 @@ def test_dataset_catalog_and_detail_api(tmp_path: Path) -> None:
         assert len(catalog_items) == 1
         assert catalog_items[0]["name"] == "Databricks Dolly 15k"
         assert catalog_items[0]["record_count"] == 5
+        assert catalog_items[0]["quality_score"] == 100
+        assert catalog_items[0]["quality_label"] == "Excellent"
 
         detail_response = client.get("/datasets/1")
         assert detail_response.status_code == 200
@@ -54,7 +56,10 @@ def test_dataset_catalog_and_detail_api(tmp_path: Path) -> None:
             "records.total",
             "tokens.mean",
         }
-        assert detail["quality_summary"]["status"] == "passed"
+        assert detail["quality_score"] == 100
+        assert detail["quality_summary"]["score"] == 100
+        assert detail["quality_summary"]["score_label"] == "Excellent"
+        assert detail["quality_summary"]["score_components"][0]["weight"] == 60
         assert "input_text" in detail["quality_summary"]["required_fields"]
         assert "Nulls are counted" in detail["quality_summary"]["null_value_policy"]
         assert detail["quality_summary"]["checks"][0]["metric_name"] == "records.empty_required_field_count"

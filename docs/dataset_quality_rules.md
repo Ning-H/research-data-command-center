@@ -2,15 +2,33 @@
 
 Status: **Dataset Agent working rule**
 
-## What `passed` Means
+## Quality Score
 
-`quality_status = passed` means the dataset version passed the MVP quality gate:
+The main quality signal is `quality_score`, a 1-100 score for a dataset version.
 
-- Every field required for the dataset's `data_purpose` is populated.
-- No required input/target pair is empty after normalization.
-- Quality metrics were generated from the normalized Parquet records, not manually invented.
+Score bands:
 
-`passed` does **not** mean the dataset is perfect. It means the version is usable for the current research purpose and has no blocking required-field issue.
+```text
+90-100 -> Excellent
+75-89  -> Good
+60-74  -> Needs review
+1-59   -> Blocked
+```
+
+The score is not a claim that the dataset is perfect. It is a compact signal that summarizes whether the version is usable for the current research purpose, backed by detailed metrics and checks.
+
+## Score Formula
+
+The MVP score uses a weighted, auditable formula:
+
+```text
+60 points -> required-field completeness
+15 points -> exact duplicate rate
+15 points -> safe PII scan match rate
+10 points -> generated schema/profile coverage
+```
+
+Required-field completeness is weighted highest because a dataset with missing purpose-critical fields cannot safely move into runs or evals.
 
 ## Null Value Policy
 
@@ -38,7 +56,7 @@ The MVP follows custom expectation-style checks inspired by Great Expectations, 
 4. Detect exact duplicates with `content_hash`.
 5. Compute rough token statistics for input and target text.
 6. Run the safe regex PII scanner on fake/test patterns only.
-7. Set `quality_status` from required-field failures for the MVP.
+7. Calculate `quality_score` from the weighted checks.
 
 ## Metrics Currently Exposed
 
@@ -50,7 +68,8 @@ tokens.mean
 tokens.p95
 pii.fake_test_match_count
 quality.gate_status_numeric
+quality.score
 schema.null_values.total
 ```
 
-`schema.null_values.total` is derived from the schema profile in the API response so the detail page can show null quality coverage even before a richer external quality framework is integrated.
+`quality.score` and `schema.null_values.total` are derived in the API response so the detail page can show a clean score and null quality coverage before a richer external quality framework is integrated.

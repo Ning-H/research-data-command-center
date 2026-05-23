@@ -51,7 +51,11 @@ class DatasetRepository:
             quality AS (
                 SELECT
                     dataset_version_id,
-                    MAX(CASE WHEN metric_name = 'quality.gate_status_numeric' THEN metric_value END) AS gate_status_numeric
+                    MAX(CASE WHEN metric_name = 'quality.gate_status_numeric' THEN metric_value END) AS gate_status_numeric,
+                    MAX(CASE WHEN metric_name = 'records.total' THEN metric_value END) AS records_total,
+                    MAX(CASE WHEN metric_name = 'records.empty_required_field_count' THEN metric_value END) AS required_empty_count,
+                    MAX(CASE WHEN metric_name = 'records.duplicate_exact_count' THEN metric_value END) AS duplicate_count,
+                    MAX(CASE WHEN metric_name = 'pii.fake_test_match_count' THEN metric_value END) AS pii_match_count
                 FROM dataset_quality_reports
                 GROUP BY 1
             )
@@ -64,7 +68,11 @@ class DatasetRepository:
                 latest_versions.record_count,
                 latest_versions.registration_date,
                 latest_versions.last_updated_date,
-                COALESCE(quality.gate_status_numeric, 1) AS gate_status_numeric
+                COALESCE(quality.gate_status_numeric, 1) AS gate_status_numeric,
+                COALESCE(quality.records_total, latest_versions.record_count) AS records_total,
+                COALESCE(quality.required_empty_count, 0) AS required_empty_count,
+                COALESCE(quality.duplicate_count, 0) AS duplicate_count,
+                COALESCE(quality.pii_match_count, 0) AS pii_match_count
             FROM latest_versions
             LEFT JOIN quality USING (dataset_version_id)
             ORDER BY latest_versions.last_updated_date DESC
@@ -73,26 +81,7 @@ class DatasetRepository:
         params.extend([limit, offset])
         rows = self._query(query, params)
         return [
-            {
-                "dataset_id": _dataset_display_id(row["source_dataset_name"]),
-                "dataset_version_id": 1,
-                "name": _display_name(row["source_dataset_name"]),
-                "source_url": _source_url(row["source_dataset_name"]),
-                "source_dataset_name": row["source_dataset_name"],
-                "task_type": row["task_type"],
-                "data_purpose": _data_purpose(row["task_type"]),
-                "data_format": "Parquet",
-                "query_engine": "DuckDB",
-                "description": _description_for_source(row["source_dataset_name"]),
-                "source_label": row["source_label"],
-                "record_count": row["record_count"],
-                "registration_date": row["registration_date"],
-                "last_updated_date": row["last_updated_date"],
-                "created_at": row["registration_date"],
-                "gate_status_numeric": row["gate_status_numeric"],
-                "quality_status": _quality_status(row["gate_status_numeric"]),
-                "category": _category_for_task(row["task_type"]),
-            }
+            _dataset_summary_from_row(row)
             for row in rows
         ]
 
@@ -354,7 +343,39 @@ def _description_for_source(source_dataset_name: str) -> str:
 
 
 def _quality_status(gate_status_numeric: float | int | None) -> str:
-    return "passed" if gate_status_numeric == 0 else "warning"
+    return "ready" if gate_status_numeric == 0 else "review"
+
+
+def _dataset_summary_from_row(row: dict[str, Any]) -> dict[str, Any]:
+    quality_score = _quality_score_from_values(
+        records_total=float(row["records_total"] or row["record_count"] or 0),
+        required_empty_count=float(row["required_empty_count"] or 0),
+        duplicate_count=float(row["duplicate_count"] or 0),
+        pii_match_count=float(row["pii_match_count"] or 0),
+        profile_available=True,
+    )
+    return {
+        "dataset_id": _dataset_display_id(row["source_dataset_name"]),
+        "dataset_version_id": 1,
+        "name": _display_name(row["source_dataset_name"]),
+        "source_url": _source_url(row["source_dataset_name"]),
+        "source_dataset_name": row["source_dataset_name"],
+        "task_type": row["task_type"],
+        "data_purpose": _data_purpose(row["task_type"]),
+        "data_format": "Parquet",
+        "query_engine": "DuckDB",
+        "description": _description_for_source(row["source_dataset_name"]),
+        "source_label": row["source_label"],
+        "record_count": row["record_count"],
+        "registration_date": row["registration_date"],
+        "last_updated_date": row["last_updated_date"],
+        "created_at": row["registration_date"],
+        "gate_status_numeric": row["gate_status_numeric"],
+        "quality_status": _quality_status(row["gate_status_numeric"]),
+        "quality_score": quality_score,
+        "quality_label": _quality_label(quality_score),
+        "category": _category_for_task(row["task_type"]),
+    }
 
 
 def _quality_summary(
@@ -370,12 +391,26 @@ def _quality_summary(
     total_null_values = sum(int(row.get("null_count", 0)) for row in schema_profile)
     fields_with_nulls = sum(1 for row in schema_profile if int(row.get("null_count", 0)) > 0)
     required_fields = _required_fields_for_task(task_type)
+    quality_score = _quality_score_from_values(
+        records_total=float(metrics.get("records.total", 0)),
+        required_empty_count=required_empty_count,
+        duplicate_count=duplicate_count,
+        pii_match_count=pii_match_count,
+        profile_available=bool(schema_profile),
+    )
     return {
         "status": quality_status,
+        "score": quality_score,
+        "score_label": _quality_label(quality_score),
+        "score_explanation": (
+            "The score is a 1-100 weighted data-quality score for this dataset version. "
+            "Required-field completeness has the highest weight, followed by duplicate rate, "
+            "safe PII scanner matches, and whether schema/profile coverage exists."
+        ),
         "framework": "Custom expectation-style checks inspired by Great Expectations, Soda, dbt tests, and data contract validation.",
         "meaning": (
-            "passed means every field required for this dataset purpose is populated. "
-            "Duplicates, token lengths, PII scanner matches, and purpose-aware null coverage are measured and surfaced for review."
+            "The quality score summarizes whether the dataset is usable for its stated purpose. "
+            "The detailed checks below show the underlying required-field, null, duplicate, token, and PII signals."
         ),
         "procedure": [
             "Normalize raw source records into the shared dataset_records schema.",
@@ -384,7 +419,29 @@ def _quality_summary(
             "Detect exact duplicate records with content_hash.",
             "Compute rough token statistics for input and target text.",
             "Run the safe regex PII scanner on fake/test patterns only.",
-            "Set the quality gate from required-field failures for the MVP.",
+            "Calculate a 1-100 score from the weighted checks.",
+        ],
+        "score_components": [
+            {
+                "name": "Required-field completeness",
+                "weight": 60,
+                "description": "Penalizes missing fields required for this dataset purpose.",
+            },
+            {
+                "name": "Exact duplicate rate",
+                "weight": 15,
+                "description": "Penalizes repeated normalized examples based on content_hash.",
+            },
+            {
+                "name": "Safe PII scan",
+                "weight": 15,
+                "description": "Penalizes fake/test PII-pattern matches found by the MVP scanner.",
+            },
+            {
+                "name": "Schema/profile coverage",
+                "weight": 10,
+                "description": "Rewards having generated field-level schema and null profiles.",
+            },
         ],
         "required_fields": required_fields,
         "null_value_policy": (
@@ -396,7 +453,7 @@ def _quality_summary(
         "checks": [
             {
                 "name": "Required fields",
-                "status": "passed" if required_empty_count == 0 else "warning",
+                "status": "ok" if required_empty_count == 0 else "review",
                 "metric_name": "records.empty_required_field_count",
                 "metric_value": required_empty_count,
                 "description": f"Required fields for this purpose: {', '.join(required_fields)}.",
@@ -410,20 +467,47 @@ def _quality_summary(
             },
             {
                 "name": "Exact duplicates",
-                "status": "review" if duplicate_count else "passed",
+                "status": "review" if duplicate_count else "ok",
                 "metric_name": "records.duplicate_exact_count",
                 "metric_value": duplicate_count,
                 "description": "Duplicates are counted by normalized content_hash.",
             },
             {
                 "name": "Safe PII pattern scan",
-                "status": "warning" if pii_match_count else "passed",
+                "status": "review" if pii_match_count else "ok",
                 "metric_name": "pii.fake_test_match_count",
                 "metric_value": pii_match_count,
                 "description": "The MVP scanner uses safe fake/test regex patterns, not real sensitive examples.",
             },
         ],
     }
+
+
+def _quality_score_from_values(
+    records_total: float,
+    required_empty_count: float,
+    duplicate_count: float,
+    pii_match_count: float,
+    profile_available: bool,
+) -> int:
+    if records_total <= 0:
+        return 1
+
+    required_score = 60 * max(0.0, 1 - (required_empty_count / records_total))
+    duplicate_score = 15 * max(0.0, 1 - (duplicate_count / records_total))
+    pii_score = 15 * max(0.0, 1 - (pii_match_count / records_total))
+    profile_score = 10 if profile_available else 0
+    return max(1, min(100, round(required_score + duplicate_score + pii_score + profile_score)))
+
+
+def _quality_label(score: int) -> str:
+    if score >= 90:
+        return "Excellent"
+    if score >= 75:
+        return "Good"
+    if score >= 60:
+        return "Needs review"
+    return "Blocked"
 
 
 def _required_fields_for_task(task_type: str) -> list[str]:

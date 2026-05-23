@@ -220,6 +220,12 @@ tr:last-child td {
   color: var(--warning);
 }
 
+.badge.danger {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
 .badge.neutral {
   background: #f2f5f8;
   border-color: var(--border);

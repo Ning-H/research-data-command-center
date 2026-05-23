@@ -15,6 +15,8 @@ export type DatasetSummary = {
   source_label: string;
   record_count: number;
   quality_status: string;
+  quality_score: number;
+  quality_label: string;
   registration_date: string;
   last_updated_date: string;
   created_at: string;
@@ -78,9 +80,17 @@ export type QualityCheck = {
 
 export type QualitySummary = {
   status: string;
+  score: number;
+  score_label: string;
+  score_explanation: string;
   framework: string;
   meaning: string;
   procedure: string[];
+  score_components: {
+    name: string;
+    weight: number;
+    description: string;
+  }[];
   required_fields: string[];
   null_value_policy: string;
   total_null_values: number;
