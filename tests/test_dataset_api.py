@@ -38,7 +38,11 @@ def test_dataset_catalog_and_detail_api(tmp_path: Path) -> None:
         assert detail_response.status_code == 200
         detail = detail_response.json()
         assert detail["dataset_version_id"] == result.dataset_version_id
+        assert detail["dataset_id"] == result.dataset_id
         assert len(detail["sample_records"]) == 5
+        assert {"input_text", "target_text", "question", "chosen_text", "rejected_text"}.issubset(
+            detail["sample_records"][0]
+        )
         assert {metric["metric_name"] for metric in detail["quality_metrics"]} >= {
             "records.total",
             "tokens.mean",

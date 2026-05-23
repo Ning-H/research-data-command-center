@@ -38,8 +38,8 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
 
       <div className="summary-grid">
         <div className="metric">
-          <p className="metric-label">Version</p>
-          <p className="metric-value">v1</p>
+          <p className="metric-label">Dataset ID</p>
+          <p className="metric-value compact">{dataset.dataset_id}</p>
         </div>
         <div className="metric">
           <p className="metric-label">Records</p>
@@ -50,8 +50,23 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           <p className="metric-value">{formatMetric(metrics["tokens.mean"])}</p>
         </div>
         <div className="metric">
-          <p className="metric-label">Quality</p>
-          <p className="metric-value">{dataset.quality_status}</p>
+          <p className="metric-label">Source</p>
+          <p className="metric-value compact">{dataset.source_dataset_name}</p>
+        </div>
+      </div>
+
+      <div className="panel">
+        <div>
+          <h2>Identity & Source</h2>
+          <p className="subtle">Stable IDs and provenance used by downstream runs, models, and evaluations.</p>
+        </div>
+        <div className="metadata-grid">
+          <Metadata label="dataset_id" value={dataset.dataset_id} />
+          <Metadata label="dataset_version_id" value={dataset.dataset_version_id} />
+          <Metadata label="source_dataset_name" value={dataset.source_dataset_name} />
+          <Metadata label="source_label" value={dataset.source_label} />
+          <Metadata label="task_type" value={dataset.task_type} />
+          <Metadata label="quality_status" value={dataset.quality_status} />
         </div>
       </div>
 
@@ -68,8 +83,12 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
                   {record.category} · row {record.source_row_id}
                 </div>
                 <h3>{record.instruction}</h3>
-                {record.context ? <p className="record-text">{record.context}</p> : null}
-                <p className="record-text">{record.response_text}</p>
+                <Metadata label="record_id" value={record.record_id} />
+                {record.question ? <RecordBlock label="Question" value={record.question} /> : null}
+                {record.input_text ? <RecordBlock label="Input" value={record.input_text} /> : null}
+                {record.chosen_text ? <RecordBlock label="Chosen" value={record.chosen_text} /> : null}
+                {record.rejected_text ? <RecordBlock label="Rejected" value={record.rejected_text} /> : null}
+                {record.target_text ? <RecordBlock label="Target" value={record.target_text} /> : null}
               </article>
             ))}
           </div>
@@ -140,13 +159,41 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
             <div className="record" key={`${edge.lineage_event_type}-${edge.target_dataset_version_id}`}>
               <span className="badge">{edge.lineage_event_type}</span>
               <h3>{edge.transform_name}</h3>
-              <p className="record-text">{edge.target_dataset_version_id}</p>
+              <Metadata label="dataset_id" value={edge.dataset_id} />
+              <Metadata label="source_dataset_version_id" value={edge.source_dataset_version_id || "public source"} />
+              <Metadata label="target_dataset_version_id" value={edge.target_dataset_version_id} />
+              <Metadata label="created_by_user_id" value={edge.created_by_user_id} />
             </div>
           ))}
         </div>
       </div>
     </section>
   );
+}
+
+function Metadata({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="metadata-item">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function RecordBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="muted-row">{label}</div>
+      <p className="record-text">{truncate(value, 900)}</p>
+    </div>
+  );
+}
+
+function truncate(value: string, maxLength: number) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength)}...`;
 }
 
 function formatMetric(value: number | undefined) {

@@ -119,8 +119,13 @@ class DatasetRepository:
                 source_row_id,
                 category,
                 task_type,
+                input_text,
                 instruction,
                 context,
+                question,
+                chosen_text,
+                rejected_text,
+                target_text,
                 response_text,
                 content_hash
             FROM dataset_records

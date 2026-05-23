@@ -156,6 +156,11 @@ h3 {
   font-weight: 750;
 }
 
+.metric-value.compact {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
 .panel {
   align-content: start;
   display: grid;
@@ -257,11 +262,46 @@ tr:last-child td {
   color: #2c3847;
   font-size: 13px;
   line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .muted-row {
   color: var(--muted);
   font-size: 12px;
+}
+
+.mono {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.metadata-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.metadata-item {
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.metadata-item span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.metadata-item strong {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
 }
 
 .placeholder-grid {
@@ -290,7 +330,8 @@ tr:last-child td {
 
   .summary-grid,
   .two-column,
-  .placeholder-grid {
+  .placeholder-grid,
+  .metadata-grid {
     grid-template-columns: 1fr;
   }
 }

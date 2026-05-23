@@ -38,8 +38,13 @@ export type DatasetRecord = {
   source_row_id: string;
   category: string;
   task_type: string;
+  input_text: string;
   instruction: string;
   context: string;
+  question: string;
+  chosen_text: string;
+  rejected_text: string;
+  target_text: string;
   response_text: string;
   content_hash: string;
 };
