@@ -23,10 +23,12 @@ JSON_LIST_FIELDS = {
 STRING_FIELDS = {
     "program_name",
     "short_name",
+    "program_description",
     "problem_statement",
     "origin_story",
     "research_goal",
     "hypothesis",
+    "target_outcome",
     "status",
     "research_area",
     "current_focus",
@@ -50,7 +52,11 @@ class RegisteredResearchProgram:
 
 def register_research_program(storage_root: Path, payload: dict[str, Any]) -> RegisteredResearchProgram:
     duckdb_path = storage_root / "duckdb" / "research_command_center.duckdb"
-    register_research_program_duckdb_view(storage_root=storage_root, duckdb_path=duckdb_path)
+    register_research_program_duckdb_view(
+        storage_root=storage_root,
+        duckdb_path=duckdb_path,
+        replace_existing=True,
+    )
     program_id = int(payload.get("program_id") or _next_id(duckdb_path, "research_programs", "program_id"))
     if _program_path(storage_root, program_id).exists():
         raise ValueError(f"program_id {program_id} already exists")
@@ -118,24 +124,30 @@ def update_research_program(
     register_research_program_duckdb_view(
         storage_root=storage_root,
         duckdb_path=storage_root / "duckdb" / "research_command_center.duckdb",
+        replace_existing=True,
     )
     return updated
 
 
-def register_research_program_duckdb_view(storage_root: Path, duckdb_path: Path) -> None:
+def register_research_program_duckdb_view(
+    storage_root: Path,
+    duckdb_path: Path,
+    replace_existing: bool = False,
+) -> None:
     duckdb_path.parent.mkdir(parents=True, exist_ok=True)
     program_root = storage_root / "parquet" / "research_programs"
     if not list(program_root.glob("**/*.parquet")):
         return
-    if _duckdb_has_table(duckdb_path, "research_programs"):
+    if not replace_existing and _duckdb_has_table(duckdb_path, "research_programs"):
         return
     pattern = str(program_root / "**" / "*.parquet").replace("'", "''")
+    create_clause = "CREATE OR REPLACE VIEW" if replace_existing else "CREATE VIEW"
     connection = duckdb.connect(str(duckdb_path))
     try:
         try:
             connection.execute(
                 f"""
-                CREATE VIEW research_programs AS
+                {create_clause} research_programs AS
                 SELECT * FROM read_parquet('{pattern}', hive_partitioning = true, union_by_name = true)
                 """
             )
@@ -163,10 +175,12 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
         "program_id": int(payload["program_id"]),
         "program_name": program_name,
         "short_name": str(payload.get("short_name") or program_name).strip(),
+        "program_description": str(payload.get("program_description") or "").strip(),
         "problem_statement": str(payload.get("problem_statement") or "").strip(),
         "origin_story": str(payload.get("origin_story") or "").strip(),
         "research_goal": str(payload.get("research_goal") or "").strip(),
         "hypothesis": str(payload.get("hypothesis") or "").strip(),
+        "target_outcome": str(payload.get("target_outcome") or "").strip(),
         "status": status,
         "research_area": str(payload.get("research_area") or "").strip(),
         "current_focus": str(payload.get("current_focus") or "").strip(),

@@ -25,10 +25,12 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
             json={
                 "program_name": "Improve structured technical study-material generation",
                 "short_name": "Python algorithms study guides",
+                "program_description": "Improve long-form educational artifacts for technical learners.",
                 "problem_statement": "Generated Python algorithm study guides are shallow and uneven.",
                 "origin_story": "A user asked for Python algorithms study materials and received a weak final document.",
                 "research_goal": "Improve coverage, depth, examples, ordering, and usefulness.",
                 "hypothesis": "Structured examples and corrected failures improve long-form study guides.",
+                "target_outcome": "A model that can produce a complete study guide from a simple request.",
                 "status": "active",
                 "research_area": "model_behavior",
                 "current_focus": "Build the first rubric-backed evaluation slice.",
@@ -53,6 +55,8 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
         assert detail_response.status_code == 200
         detail = detail_response.json()
         assert detail["program_name"] == "Improve structured technical study-material generation"
+        assert detail["program_description"] == "Improve long-form educational artifacts for technical learners."
+        assert detail["target_outcome"] == "A model that can produce a complete study guide from a simple request."
         assert detail["linked_dataset_ids"] == [1]
         assert detail["ui_workflow"]["can_update_from_ui"] is True
 
@@ -61,12 +65,14 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
             json={
                 "status": "paused",
                 "current_focus": "Waiting for evaluation-slice implementation.",
+                "target_outcome": "Produce useful, complete study guides with measurable rubric gains.",
                 "researcher_names": ["minion1", "minion2", "minion3"],
             },
         )
         assert patch_response.status_code == 200
         patched = patch_response.json()
         assert patched["status"] == "paused"
+        assert patched["target_outcome"] == "Produce useful, complete study guides with measurable rubric gains."
         assert patched["researcher_names"] == ["minion1", "minion2", "minion3"]
     finally:
         app.dependency_overrides.clear()
