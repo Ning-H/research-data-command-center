@@ -3,12 +3,18 @@ from pathlib import Path
 import duckdb
 
 from app.datasets.public_ingestions import (
+    HUMANEVAL,
     HH_RLHF,
     SAMSUM,
+    SQUAD,
+    ingest_humaneval_records,
     ingest_hh_rlhf_records,
     ingest_samsum_records,
+    ingest_squad_records,
+    normalize_humaneval_record,
     normalize_hh_rlhf_record,
     normalize_samsum_record,
+    normalize_squad_record,
 )
 from app.datasets.pipeline import build_dataset_version_id
 
@@ -53,6 +59,50 @@ def test_samsum_normalization_maps_summary_pair() -> None:
     assert record["source_row_id"] == "dialogue-1"
 
 
+def test_squad_normalization_maps_qa_pair() -> None:
+    dataset_version_id = build_dataset_version_id(SQUAD)
+    record = normalize_squad_record(
+        {
+            "id": "qa-1",
+            "title": "Research_Platform",
+            "context": "The dataset version feeds a training run.",
+            "question": "What feeds a training run?",
+            "answers": {"text": ["dataset version"], "answer_start": [4]},
+        },
+        source_row_id=0,
+        dataset_version_id=dataset_version_id,
+        created_at="2026-05-22T00:00:00Z",
+    )
+
+    assert record["dataset_id"] == "ds_squad"
+    assert record["task_type"] == "question_answering"
+    assert record["question"] == "What feeds a training run?"
+    assert record["target_text"] == "dataset version"
+    assert record["source_row_id"] == "qa-1"
+
+
+def test_humaneval_normalization_maps_coding_task() -> None:
+    dataset_version_id = build_dataset_version_id(HUMANEVAL)
+    record = normalize_humaneval_record(
+        {
+            "task_id": "HumanEval/0",
+            "prompt": "def add(a, b):",
+            "canonical_solution": "    return a + b",
+            "test": "def check(candidate): assert candidate(1, 2) == 3",
+            "entry_point": "add",
+        },
+        source_row_id=0,
+        dataset_version_id=dataset_version_id,
+        created_at="2026-05-22T00:00:00Z",
+    )
+
+    assert record["dataset_id"] == "ds_openai_humaneval"
+    assert record["task_type"] == "coding_eval"
+    assert record["question"] == "def add(a, b):"
+    assert record["target_text"] == "return a + b"
+    assert record["source_row_id"] == "HumanEval/0"
+
+
 def test_public_ingestions_share_duckdb_catalog(tmp_path: Path) -> None:
     ingest_hh_rlhf_records(
         storage_root=tmp_path,
@@ -63,13 +113,37 @@ def test_public_ingestions_share_duckdb_catalog(tmp_path: Path) -> None:
             }
         ],
     )
-    result = ingest_samsum_records(
+    ingest_samsum_records(
         storage_root=tmp_path,
         source_records=[
             {
                 "id": "dialogue-1",
                 "dialogue": "A: Ship it?\nB: Tests passed.",
                 "summary": "The tests passed, so it can ship.",
+            }
+        ],
+    )
+    ingest_squad_records(
+        storage_root=tmp_path,
+        source_records=[
+            {
+                "id": "qa-1",
+                "title": "Research_Platform",
+                "context": "A dataset version feeds a training run.",
+                "question": "What feeds a training run?",
+                "answers": {"text": ["dataset version"], "answer_start": [2]},
+            }
+        ],
+    )
+    result = ingest_humaneval_records(
+        storage_root=tmp_path,
+        source_records=[
+            {
+                "task_id": "HumanEval/0",
+                "prompt": "def add(a, b):",
+                "canonical_solution": "    return a + b",
+                "test": "def check(candidate): assert candidate(1, 2) == 3",
+                "entry_point": "add",
             }
         ],
     )
@@ -84,5 +158,7 @@ def test_public_ingestions_share_duckdb_catalog(tmp_path: Path) -> None:
 
     assert rows == [
         ("ds_anthropic_hh_rlhf", "preference_pair", 1),
+        ("ds_openai_humaneval", "coding_eval", 1),
         ("ds_samsum", "summarization", 1),
+        ("ds_squad", "question_answering", 1),
     ]

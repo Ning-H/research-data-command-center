@@ -43,9 +43,41 @@ SAMSUM = DatasetDefinition(
     transform_name="normalize_samsum",
 )
 
+SQUAD = DatasetDefinition(
+    dataset_id="ds_squad",
+    slug="squad",
+    display_name="SQuAD Question Answering",
+    source_dataset_name="allenai/squad",
+    category="question_answering",
+    task_type="question_answering",
+    description="Context/question/answer records used for QA evaluation and optional training workflows.",
+    transform_name="normalize_squad",
+)
+
+HUMANEVAL = DatasetDefinition(
+    dataset_id="ds_openai_humaneval",
+    slug="openai_humaneval",
+    display_name="OpenAI HumanEval",
+    source_dataset_name="openai/openai_humaneval",
+    category="coding_eval",
+    task_type="coding_eval",
+    description="Python coding benchmark tasks with prompts, canonical solutions, and tests for evaluation workflows.",
+    transform_name="normalize_openai_humaneval",
+)
+
 NORMALIZERS: dict[str, tuple[DatasetDefinition, Callable[[dict[str, Any], int, str, str, str], dict[str, Any]]]] = {
     "hh-rlhf": (HH_RLHF, lambda row, row_id, version_id, created_at, split: normalize_hh_rlhf_record(row, row_id, version_id, created_at, split)),
+    "humaneval": (HUMANEVAL, lambda row, row_id, version_id, created_at, split: normalize_humaneval_record(row, row_id, version_id, created_at, split)),
     "samsum": (SAMSUM, lambda row, row_id, version_id, created_at, split: normalize_samsum_record(row, row_id, version_id, created_at, split)),
+    "squad": (SQUAD, lambda row, row_id, version_id, created_at, split: normalize_squad_record(row, row_id, version_id, created_at, split)),
+}
+
+DEFAULT_CONFIGS = {
+    "humaneval": "openai_humaneval",
+}
+
+DEFAULT_SPLITS = {
+    "humaneval": "test",
 }
 
 
@@ -90,6 +122,7 @@ def normalize_hh_rlhf_record(
         input_text=prompt,
         instruction="Compare assistant responses for helpfulness and safety.",
         context=prompt,
+        question="",
         chosen_text=chosen,
         rejected_text=rejected,
         target_text=chosen,
@@ -120,11 +153,81 @@ def normalize_samsum_record(
         input_text=dialogue,
         instruction="Summarize the dialogue.",
         context=dialogue,
+        question="",
         chosen_text="",
         rejected_text="",
         target_text=summary,
         response_text=summary,
         metadata={"source_id": source_id},
+        content_hash=content_hash,
+        created_at=created_at,
+    )
+
+
+def normalize_squad_record(
+    source_row: dict[str, Any],
+    source_row_id: int,
+    dataset_version_id: str,
+    created_at: str,
+    source_split: str = "train",
+) -> dict[str, Any]:
+    source_id = clean_text(source_row.get("id")) or str(source_row_id)
+    title = clean_text(source_row.get("title"))
+    context = clean_text(source_row.get("context"))
+    question = clean_text(source_row.get("question"))
+    answers = source_row.get("answers") or {}
+    answer_texts = answers.get("text") or []
+    target_text = clean_text(answer_texts[0] if answer_texts else "")
+    input_text = f"{context}\n\nQuestion: {question}".strip()
+    content_hash = content_hash_for_fields(source_id, context, question, target_text)
+    return _base_record(
+        definition=SQUAD,
+        dataset_version_id=dataset_version_id,
+        source_split=source_split,
+        source_row_id=source_id,
+        category="question_answering",
+        input_text=input_text,
+        instruction="Answer the question using the provided context.",
+        context=context,
+        question=question,
+        chosen_text="",
+        rejected_text="",
+        target_text=target_text,
+        response_text=target_text,
+        metadata={"title": title, "answers": answers},
+        content_hash=content_hash,
+        created_at=created_at,
+    )
+
+
+def normalize_humaneval_record(
+    source_row: dict[str, Any],
+    source_row_id: int,
+    dataset_version_id: str,
+    created_at: str,
+    source_split: str = "test",
+) -> dict[str, Any]:
+    task_id = clean_text(source_row.get("task_id")) or str(source_row_id)
+    prompt = clean_text(source_row.get("prompt"))
+    canonical_solution = clean_text(source_row.get("canonical_solution"))
+    test_code = clean_text(source_row.get("test"))
+    entry_point = clean_text(source_row.get("entry_point"))
+    content_hash = content_hash_for_fields(task_id, prompt, canonical_solution, test_code)
+    return _base_record(
+        definition=HUMANEVAL,
+        dataset_version_id=dataset_version_id,
+        source_split=source_split,
+        source_row_id=task_id,
+        category="coding_eval",
+        input_text=prompt,
+        instruction="Complete the Python function so it passes the provided tests.",
+        context=test_code,
+        question=prompt,
+        chosen_text="",
+        rejected_text="",
+        target_text=canonical_solution,
+        response_text=canonical_solution,
+        metadata={"task_id": task_id, "entry_point": entry_point, "test": test_code},
         content_hash=content_hash,
         created_at=created_at,
     )
@@ -146,28 +249,46 @@ def ingest_samsum_records(
     return _ingest_records(storage_root, SAMSUM, source_records, normalize_samsum_record, source_split)
 
 
+def ingest_squad_records(
+    storage_root: Path,
+    source_records: list[dict[str, Any]],
+    source_split: str = "train",
+) -> IngestionResult:
+    return _ingest_records(storage_root, SQUAD, source_records, normalize_squad_record, source_split)
+
+
+def ingest_humaneval_records(
+    storage_root: Path,
+    source_records: list[dict[str, Any]],
+    source_split: str = "test",
+) -> IngestionResult:
+    return _ingest_records(storage_root, HUMANEVAL, source_records, normalize_humaneval_record, source_split)
+
+
 def ingest_from_hugging_face(
     storage_root: Path,
     dataset_key: str,
-    split: str = "train",
+    split: str | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> IngestionResult:
     definition, normalizer = NORMALIZERS[dataset_key]
+    resolved_split = split or DEFAULT_SPLITS.get(dataset_key, "train")
     source_records = fetch_hugging_face_rows(
         dataset_name=definition.source_dataset_name,
-        split=split,
+        config=DEFAULT_CONFIGS.get(dataset_key, "default"),
+        split=resolved_split,
         limit=limit,
         offset=offset,
     )
-    return _ingest_records(storage_root, definition, source_records, normalizer, split)
+    return _ingest_records(storage_root, definition, source_records, normalizer, resolved_split)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Ingest sampled public Hugging Face datasets.")
     parser.add_argument("dataset", choices=sorted(NORMALIZERS.keys()))
     parser.add_argument("--storage-root", default="storage", type=Path)
-    parser.add_argument("--split", default="train")
+    parser.add_argument("--split", default=None)
     parser.add_argument("--limit", default=100, type=int)
     parser.add_argument("--offset", default=0, type=int)
     args = parser.parse_args(argv)
@@ -226,6 +347,7 @@ def _base_record(
     input_text: str,
     instruction: str,
     context: str,
+    question: str,
     chosen_text: str,
     rejected_text: str,
     target_text: str,
@@ -246,7 +368,7 @@ def _base_record(
         "input_text": input_text,
         "instruction": instruction,
         "context": context,
-        "question": "",
+        "question": question,
         "chosen_text": chosen_text,
         "rejected_text": rejected_text,
         "target_text": target_text,

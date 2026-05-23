@@ -205,6 +205,8 @@ def _display_name(source_dataset_name: str) -> str:
         "databricks/databricks-dolly-15k": "Databricks Dolly 15k",
         "Anthropic/hh-rlhf": "Anthropic HH-RLHF",
         "knkarthick/samsum": "SAMSum Dialogue Summarization",
+        "allenai/squad": "SQuAD Question Answering",
+        "openai/openai_humaneval": "OpenAI HumanEval",
     }.get(source_dataset_name, source_dataset_name)
 
 
@@ -213,6 +215,8 @@ def _category_for_task(task_type: str) -> str:
         "instruction_tuning": "Instruction tuning",
         "preference_pair": "Preference / safety",
         "summarization": "Summarization",
+        "question_answering": "Question answering",
+        "coding_eval": "Coding eval",
     }.get(task_type, task_type.replace("_", " ").title())
 
 
@@ -221,6 +225,8 @@ def _description_for_source(source_dataset_name: str) -> str:
         "databricks/databricks-dolly-15k": "Human-written instruction-following data used to bootstrap the dataset catalog and training-data workflow.",
         "Anthropic/hh-rlhf": "Chosen/rejected assistant responses for preference, helpfulness, and safety research workflows.",
         "knkarthick/samsum": "Dialogue-summary pairs for summarization training and evaluation workflows.",
+        "allenai/squad": "Context/question/answer records for QA evaluation and optional training workflows.",
+        "openai/openai_humaneval": "Python coding benchmark tasks for model evaluation and checkpoint comparison workflows.",
     }.get(source_dataset_name, "Versioned public dataset normalized into the shared research-data schema.")
 
 

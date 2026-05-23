@@ -66,6 +66,8 @@ Additional sampled public dataset ingestors:
 ```bash
 uv run --python 3.13 python scripts/ingest_public_dataset.py hh-rlhf --limit 100
 uv run --python 3.13 python scripts/ingest_public_dataset.py samsum --limit 100
+uv run --python 3.13 python scripts/ingest_public_dataset.py squad --limit 100
+uv run --python 3.13 python scripts/ingest_public_dataset.py humaneval --limit 100
 ```
 
 Generated raw, object-store, Parquet, and DuckDB files are written under `storage/` and intentionally ignored by git.
