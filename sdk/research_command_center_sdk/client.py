@@ -89,6 +89,38 @@ class ResearchCommandCenterClient:
     def trace_run_lineage(self, run_id: str | int) -> dict[str, Any]:
         return self._get(f"/runs/{run_id}/lineage")
 
+    def list_models(self) -> dict[str, Any]:
+        return self._get("/models")
+
+    def register_model_from_checkpoint(
+        self,
+        checkpoint_id: str | int,
+        model_name: str,
+        model_version_name: str,
+        intended_use: str = "",
+        promotion_reason: str = "",
+        promotion_notes: str = "",
+        owner_user_id: str = "user_demo_owner",
+    ) -> dict[str, Any]:
+        return self._post(
+            "/models/register-from-checkpoint",
+            {
+                "checkpoint_id": int(checkpoint_id),
+                "model_name": model_name,
+                "model_version_name": model_version_name,
+                "intended_use": intended_use,
+                "promotion_reason": promotion_reason,
+                "promotion_notes": promotion_notes,
+                "owner_user_id": owner_user_id,
+            },
+        )
+
+    def get_model(self, model_version_id: str | int) -> dict[str, Any]:
+        return self._get(f"/models/{model_version_id}")
+
+    def trace_model_lineage(self, model_version_id: str | int) -> dict[str, Any]:
+        return self._get(f"/models/{model_version_id}/lineage")
+
     def _get(self, path: str) -> dict[str, Any]:
         with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
             response = client.get(path)

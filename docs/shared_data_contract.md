@@ -167,6 +167,7 @@ The table definitions below intentionally define shared boundaries, not every fu
 - `model_version_id`
 - `checkpoint_id`
 - `run_id`
+- `dataset_id`
 - `dataset_version_id`
 - `status`
 - `artifact_uri`

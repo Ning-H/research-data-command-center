@@ -119,6 +119,7 @@ APP_METADATA_TABLES: tuple[TableContract, ...] = (
             "model_version_id",
             "checkpoint_id",
             "run_id",
+            "dataset_id",
             "dataset_version_id",
             "status",
             "artifact_uri",

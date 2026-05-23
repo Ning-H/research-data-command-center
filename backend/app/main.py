@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.datasets.api import router as datasets_router
+from app.models.api import router as models_router
 from app.runs.api import checkpoints_router, router as runs_router
 from research_command_center_contract import ANALYTICAL_TABLES, APP_METADATA_TABLES, CANONICAL_KEYS
 
@@ -13,6 +14,7 @@ app = FastAPI(
 app.include_router(datasets_router)
 app.include_router(runs_router)
 app.include_router(checkpoints_router)
+app.include_router(models_router)
 
 
 @app.get("/health")

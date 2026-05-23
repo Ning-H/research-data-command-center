@@ -173,6 +173,73 @@ export type CheckpointSearchResult = RunCheckpoint & {
   promotion_status: string;
 };
 
+export type ModelLineageEdge = {
+  lineage_step: string;
+  source_type: string;
+  source_id: number;
+  target_type: string;
+  target_id: number;
+};
+
+export type ModelVersionSummary = {
+  model_id: number;
+  model_version_id: number;
+  model_name: string;
+  model_version_name: string;
+  checkpoint_id: number;
+  run_id: number;
+  dataset_id: number;
+  dataset_version_id: number;
+  run_config_id: number;
+  source_run_name: string;
+  source_experiment_name: string;
+  base_model_name: string;
+  source_checkpoint_step: number;
+  status: string;
+  artifact_uri: string;
+  registry_manifest_uri: string;
+  intended_use: string;
+  promotion_reason: string;
+  promotion_notes: string;
+  expected_eval_suite_ids: string[];
+  metrics_snapshot: Record<string, number>;
+  source_priority: string;
+  created_at: string;
+  created_by_user_id: string;
+  lineage_summary: {
+    dataset_id: number;
+    dataset_version_id: number;
+    run_id: number;
+    checkpoint_id: number;
+    model_version_id: number;
+  };
+};
+
+export type ModelVersionDetail = ModelVersionSummary & {
+  lineage: ModelLineageEdge[];
+};
+
+export type RegisterModelPayload = {
+  checkpoint_id: number;
+  model_name: string;
+  model_version_name: string;
+  intended_use: string;
+  promotion_reason: string;
+  promotion_notes: string;
+  owner_user_id: string;
+};
+
+export type RegisterModelResponse = {
+  model_id: number;
+  model_version_id: number;
+  checkpoint_id: number;
+  run_id: number;
+  dataset_id: number;
+  dataset_version_id: number;
+  status: string;
+  artifact_uri: string;
+};
+
 export type RunLineageEdge = {
   lineage_step: string;
   source_type: string;
@@ -247,9 +314,37 @@ export async function searchCheckpoints(params: Record<string, string | number |
   return payload.items;
 }
 
+export async function listModels(): Promise<ModelVersionSummary[]> {
+  const payload = await getJson<{ items: ModelVersionSummary[] }>("/models");
+  return payload.items;
+}
+
+export async function getModel(modelVersionId: string): Promise<ModelVersionDetail> {
+  return getJson<ModelVersionDetail>(`/models/${modelVersionId}`);
+}
+
+export async function registerModelFromCheckpoint(payload: RegisterModelPayload): Promise<RegisterModelResponse> {
+  return postJson<RegisterModelResponse>("/models/register-from-checkpoint", payload);
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+async function postJson<T>(path: string, payload: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    body: JSON.stringify(payload),
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
   });
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status} ${response.statusText}`);

@@ -76,7 +76,7 @@ def test_core_lineage_tables_keep_foreign_keys_explicit() -> None:
     tables = {table.name: table for table in (*APP_METADATA_TABLES, *ANALYTICAL_TABLES)}
 
     assert {"run_id", "dataset_version_id"}.issubset(tables["checkpoints"].columns)
-    assert {"checkpoint_id", "run_id", "dataset_version_id"}.issubset(
+    assert {"checkpoint_id", "run_id", "dataset_id", "dataset_version_id"}.issubset(
         tables["model_versions"].columns
     )
     assert {"eval_run_id", "model_version_id", "dataset_version_id"}.issubset(

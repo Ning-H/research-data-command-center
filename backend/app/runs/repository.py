@@ -445,7 +445,9 @@ def _checkpoint_search_row(row: dict[str, Any], ranking_metric: str) -> dict[str
         "ranking_value": ranking_value,
         "created_at": row["created_at"],
         "run_config": run_config,
-        "promotion_status": "not_promoted_yet",
+        "promotion_status": "promoted"
+        if row["status"] == "promoted"
+        else "not_promoted_yet",
     }
 
 

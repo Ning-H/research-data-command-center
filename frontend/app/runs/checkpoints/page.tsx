@@ -85,6 +85,7 @@ export default async function CheckpointsPage({ searchParams = {} }: Checkpoints
               <th>Score</th>
               <th>Loss</th>
               <th>Artifact</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -117,6 +118,11 @@ export default async function CheckpointsPage({ searchParams = {} }: Checkpoints
                 <td>{formatMetric(checkpoint.metrics_snapshot["train.loss"])}</td>
                 <td>
                   <span className="mono">{checkpoint.checkpoint_uri}</span>
+                </td>
+                <td>
+                  <Link className="button secondary" href={`/models/promote?checkpoint_id=${checkpoint.checkpoint_id}`}>
+                    Promote
+                  </Link>
                 </td>
               </tr>
             ))}
