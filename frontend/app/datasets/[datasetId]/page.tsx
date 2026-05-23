@@ -58,11 +58,11 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
       <div className="panel">
         <div>
           <h2>Source & Version</h2>
-          <p className="subtle">Human-readable source first; stable IDs remain available for lineage, APIs, and joins.</p>
+          <p className="subtle">Numeric platform IDs first; dataset names and source links remain human-readable.</p>
         </div>
         <div className="metadata-grid">
-          <Metadata label="dataset_id" value={dataset.dataset_display_id} />
-          <Metadata label="dataset_version_id" value={dataset.dataset_version_display_id} />
+          <Metadata label="dataset_id" value={dataset.dataset_id} />
+          <Metadata label="dataset_version_id" value={dataset.dataset_version_id} />
           <Metadata label="dataset_name" value={dataset.name} />
           <Metadata label="source_link" value={dataset.source_dataset_name} href={dataset.source_url} />
           <Metadata label="record_count" value={dataset.record_count.toLocaleString()} />
@@ -70,8 +70,6 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           <Metadata label="task_type" value={dataset.task_type} />
           <Metadata label="mean_tokens" value={formatMetric(metrics["tokens.mean"])} />
           <Metadata label="quality_status" value={dataset.quality_status} />
-          <Metadata label="url_slug" value={dataset.route_dataset_id} />
-          <Metadata label="version_storage_key" value={dataset.dataset_version_id} />
         </div>
       </div>
 
@@ -83,14 +81,13 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           </div>
           <div className="record-list">
             {dataset.sample_records.slice(0, 5).map((record) => (
-              <article className="record" key={record.record_storage_key}>
+              <article className="record" key={`${dataset.dataset_id}-${dataset.dataset_version_id}-${record.record_id}`}>
                 <div className="muted-row">
-                  {record.category} · record_id {record.record_display_id}
+                  {record.category} · record_id {record.record_id}
                 </div>
                 <h3>{record.instruction}</h3>
-                <Metadata label="record_id" value={record.record_display_id} />
+                <Metadata label="record_id" value={record.record_id} />
                 <Metadata label="source_row_id" value={record.source_row_id} />
-                <Metadata label="record_storage_key" value={record.record_storage_key} />
                 {record.question ? <RecordBlock label="Question" value={record.question} /> : null}
                 {record.input_text ? <RecordBlock label="Input" value={record.input_text} /> : null}
                 {record.chosen_text ? <RecordBlock label="Chosen" value={record.chosen_text} /> : null}
@@ -166,10 +163,9 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
             <div className="record" key={`${edge.lineage_event_type}-${edge.target_dataset_version_id}`}>
               <span className="badge">{edge.lineage_event_type}</span>
               <h3>{edge.transform_name}</h3>
-              <Metadata label="dataset_id" value={edge.dataset_display_id} />
-              <Metadata label="source_dataset_version_id" value={edge.source_dataset_version_display_id || edge.source_label} />
-              <Metadata label="target_dataset_version_id" value={edge.target_dataset_version_display_id} />
-              <Metadata label="version_storage_key" value={edge.target_dataset_version_id} />
+              <Metadata label="dataset_id" value={edge.dataset_id} />
+              <Metadata label="source_dataset_version_id" value={edge.source_dataset_version_id || edge.source_label} />
+              <Metadata label="target_dataset_version_id" value={edge.target_dataset_version_id} />
               <Metadata label="created_by_user_id" value={edge.created_by_user_id} />
             </div>
           ))}

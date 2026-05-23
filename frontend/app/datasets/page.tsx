@@ -60,10 +60,10 @@ export default async function DatasetsPage() {
                 <td>
                   <strong>{dataset.name}</strong>
                   <div className="muted-row">{dataset.source_dataset_name}</div>
-                  <div className="muted-row mono">dataset_id {dataset.dataset_display_id}</div>
+                  <div className="muted-row mono">dataset_id {dataset.dataset_id}</div>
                 </td>
                 <td>{dataset.category}</td>
-                <td>v{dataset.dataset_version_display_id}</td>
+                <td>v{dataset.dataset_version_id}</td>
                 <td>{dataset.record_count.toLocaleString()}</td>
                 <td>
                   <span className={dataset.quality_status === "passed" ? "badge" : "badge warning"}>

@@ -281,17 +281,22 @@ dataset_candidate_source
 - Every dataset version is immutable after `status = published`.
 - Any transform creates a new `dataset_version_id`.
 - Parent-child edges are stored in `dataset_versions.parent_dataset_version_id` for simple lineage and in `dataset_lineage` for the full graph.
-- Version IDs should be deterministic enough for demos but unique:
+- App-facing version IDs should be numeric and stable within each dataset:
 
 ```text
-dsv_{dataset_slug}_{stage}_{yyyymmdd}_{short_hash}
+dataset_id: 1
+dataset_version_id: 1
 ```
 
-- Record IDs should be stable across reruns:
+- App-facing record IDs should be numeric and incremental within a dataset version:
 
 ```text
-rec_{dataset_version_id}_{source_split}_{source_row_id}_{content_hash_prefix}
+record_id: 1
+record_id: 2
+record_id: 3
 ```
+
+- Raw/source filenames and internal storage keys can remain implementation details inside the storage layer, but UI/API routes and lineage should use the numeric IDs above.
 
 ## First Walking Skeleton
 

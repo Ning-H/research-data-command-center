@@ -5,11 +5,12 @@ Status: **Dataset Agent working rule**
 ## Identifier Meanings
 
 - `dataset_id` is the human-facing catalog identity for a dataset family. In the UI this is shown as a small stable number, such as `1` or `2`.
-- `dataset_slug` / route key is the URL-safe technical identifier, such as `ds_anthropic_hh_rlhf`.
+- `dataset_id` is also the route identity. A dataset detail URL should be `/datasets/{dataset_id}`, such as `/datasets/1`.
+- `dataset_name` is the human-readable name, such as `Anthropic HH-RLHF`.
+- Public/raw source names remain provenance metadata only. They are not the application identity.
 - `dataset_version_id` is the human-facing current version number for a dataset, such as `1`.
-- `dataset_version_storage_key` is the immutable backend storage key, such as `dsv_anthropic_hh_rlhf_raw_v1_7b57e8e5e3`.
 - `record_id` is the human-facing row number within the displayed dataset version.
-- `record_storage_key` is the deterministic backend record key used for storage and joins.
+- Internal file/storage keys may exist in the storage layer, but they should not be exposed in normal UI or API payloads.
 
 ## When Version Changes
 
@@ -37,7 +38,7 @@ Every dataset detail page should expose:
 - Human-facing `dataset_version_id`.
 - Public source link.
 - Source label: `PUBLIC_REAL`, `GENERATED_REAL`, or `SYNTHETIC_REALISTIC`.
-- Backend route/storage keys in secondary metadata for traceability.
+- Numeric `record_id` values for sample records.
 
 ## Lineage Display
 
@@ -49,7 +50,7 @@ source_dataset_version_id: public source
 target_dataset_version_id: 1
 ```
 
-Backend storage keys can be shown as secondary values only when useful for debugging or API traceability.
+Internal storage keys stay inside the repository/storage layer.
 
 ## Record Display
 
@@ -59,4 +60,4 @@ Sample records should show:
 record_id: 1
 ```
 
-The deterministic backend record key remains available as `record_storage_key`, but should not be the primary visual identifier.
+The internal record key should stay hidden from normal UI and API responses.

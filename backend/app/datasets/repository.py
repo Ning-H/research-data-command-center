@@ -72,12 +72,16 @@ class DatasetRepository:
         rows = self._query(query, params)
         return [
             {
-                **row,
+                "dataset_id": _dataset_display_id(row["source_dataset_name"]),
+                "dataset_version_id": 1,
                 "name": _display_name(row["source_dataset_name"]),
-                "dataset_display_id": _dataset_display_id(row["source_dataset_name"]),
-                "dataset_version_display_id": 1,
-                "route_dataset_id": row["dataset_id"],
                 "source_url": _source_url(row["source_dataset_name"]),
+                "source_dataset_name": row["source_dataset_name"],
+                "task_type": row["task_type"],
+                "source_label": row["source_label"],
+                "record_count": row["record_count"],
+                "created_at": row["created_at"],
+                "gate_status_numeric": row["gate_status_numeric"],
                 "quality_status": _quality_status(row["gate_status_numeric"]),
                 "category": _category_for_task(row["task_type"]),
             }
@@ -85,18 +89,19 @@ class DatasetRepository:
         ]
 
     def get_dataset(self, dataset_id: str) -> dict[str, Any] | None:
-        datasets = [dataset for dataset in self.list_datasets() if dataset["dataset_id"] == dataset_id]
+        datasets = [dataset for dataset in self.list_datasets() if str(dataset["dataset_id"]) == str(dataset_id)]
         if not datasets:
             return None
         dataset = datasets[0]
-        dataset_version_id = dataset["dataset_version_id"]
+        storage_dataset_id = _storage_dataset_id_for_display_id(dataset["dataset_id"])
+        storage_dataset_version_id = _storage_version_id_for_display_id(dataset["dataset_id"], dataset["dataset_version_id"])
         return {
             **dataset,
             "description": _description_for_source(dataset["source_dataset_name"]),
-            "quality_metrics": self.get_quality_metrics(dataset_id, dataset_version_id),
-            "schema_profile": self.get_schema_profile(dataset_id, dataset_version_id, limit=12),
-            "lineage": self.get_lineage(dataset_id, dataset_version_id),
-            "sample_records": self.list_records(dataset_id, dataset_version_id, limit=10),
+            "quality_metrics": self._get_quality_metrics_by_storage_version(storage_dataset_version_id),
+            "schema_profile": self._get_schema_profile_by_storage_version(storage_dataset_version_id, limit=12),
+            "lineage": self._get_lineage_by_storage_ids(storage_dataset_id, storage_dataset_version_id),
+            "sample_records": self.list_records(str(dataset["dataset_id"]), str(dataset["dataset_version_id"]), limit=10),
         }
 
     def list_records(
@@ -107,8 +112,10 @@ class DatasetRepository:
         offset: int = 0,
         q: str | None = None,
     ) -> list[dict[str, Any]]:
+        storage_dataset_id = _storage_dataset_id_for_display_id(dataset_id)
+        storage_dataset_version_id = _storage_version_id_for_display_id(dataset_id, dataset_version_id)
         filters = ["dataset_id = ?", "dataset_version_id = ?"]
-        params: list[Any] = [dataset_id, dataset_version_id]
+        params: list[Any] = [storage_dataset_id, storage_dataset_version_id]
         if q:
             filters.append(
                 "(instruction ILIKE ? OR context ILIKE ? OR response_text ILIKE ? OR category ILIKE ?)"
@@ -118,8 +125,7 @@ class DatasetRepository:
         return self._query(
             f"""
             SELECT
-                ROW_NUMBER() OVER (ORDER BY TRY_CAST(source_row_id AS INTEGER), source_row_id) + ? AS record_display_id,
-                record_id AS record_storage_key,
+                ROW_NUMBER() OVER (ORDER BY TRY_CAST(source_row_id AS INTEGER), source_row_id) + ? AS record_id,
                 source_split,
                 source_row_id,
                 category,
@@ -143,6 +149,10 @@ class DatasetRepository:
 
     def get_quality_metrics(self, dataset_id: str, dataset_version_id: str) -> list[dict[str, Any]]:
         _ = dataset_id
+        storage_dataset_version_id = _storage_version_id_for_display_id(dataset_id, dataset_version_id)
+        return self._get_quality_metrics_by_storage_version(storage_dataset_version_id)
+
+    def _get_quality_metrics_by_storage_version(self, storage_dataset_version_id: str) -> list[dict[str, Any]]:
         return self._query(
             """
             SELECT metric_name, metric_value, source_priority, timestamp
@@ -150,7 +160,7 @@ class DatasetRepository:
             WHERE dataset_version_id = ?
             ORDER BY metric_name
             """,
-            [dataset_version_id],
+            [storage_dataset_version_id],
         )
 
     def get_schema_profile(
@@ -160,6 +170,14 @@ class DatasetRepository:
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
         _ = dataset_id
+        storage_dataset_version_id = _storage_version_id_for_display_id(dataset_id, dataset_version_id)
+        return self._get_schema_profile_by_storage_version(storage_dataset_version_id, limit=limit)
+
+    def _get_schema_profile_by_storage_version(
+        self,
+        storage_dataset_version_id: str,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         query = """
             SELECT
                 field_name,
@@ -175,13 +193,22 @@ class DatasetRepository:
             WHERE dataset_version_id = ?
             ORDER BY field_name
         """
-        params: list[Any] = [dataset_version_id]
+        params: list[Any] = [storage_dataset_version_id]
         if limit is not None:
             query += " LIMIT ?"
             params.append(limit)
         return self._query(query, params)
 
     def get_lineage(self, dataset_id: str, dataset_version_id: str) -> list[dict[str, Any]]:
+        storage_dataset_id = _storage_dataset_id_for_display_id(dataset_id)
+        storage_dataset_version_id = _storage_version_id_for_display_id(dataset_id, dataset_version_id)
+        return self._get_lineage_by_storage_ids(storage_dataset_id, storage_dataset_version_id)
+
+    def _get_lineage_by_storage_ids(
+        self,
+        storage_dataset_id: str,
+        storage_dataset_version_id: str,
+    ) -> list[dict[str, Any]]:
         rows = self._query(
             """
             SELECT
@@ -197,15 +224,19 @@ class DatasetRepository:
             WHERE dataset_id = ? AND target_dataset_version_id = ?
             ORDER BY created_at
             """,
-            [dataset_id, dataset_version_id],
+            [storage_dataset_id, storage_dataset_version_id],
         )
         return [
             {
-                **row,
-                "dataset_display_id": _dataset_display_id_for_dataset_id(row["dataset_id"]),
-                "source_dataset_version_display_id": "",
-                "target_dataset_version_display_id": 1,
+                "dataset_id": _dataset_display_id_for_storage_id(row["dataset_id"]),
+                "source_dataset_version_id": "",
+                "target_dataset_version_id": 1,
                 "source_label": "public source",
+                "lineage_event_type": row["lineage_event_type"],
+                "transform_name": row["transform_name"],
+                "transform_config_uri": row["transform_config_uri"],
+                "created_at": row["created_at"],
+                "created_by_user_id": row["created_by_user_id"],
             }
             for row in rows
         ]
@@ -240,7 +271,7 @@ def _dataset_display_id(source_dataset_name: str) -> int:
     }.get(source_dataset_name, 0)
 
 
-def _dataset_display_id_for_dataset_id(dataset_id: str) -> int:
+def _dataset_display_id_for_storage_id(dataset_id: str) -> int:
     return {
         "ds_databricks_dolly_15k": 1,
         "ds_anthropic_hh_rlhf": 2,
@@ -248,6 +279,28 @@ def _dataset_display_id_for_dataset_id(dataset_id: str) -> int:
         "ds_squad": 4,
         "ds_openai_humaneval": 5,
     }.get(dataset_id, 0)
+
+
+def _storage_dataset_id_for_display_id(dataset_id: str | int) -> str:
+    return {
+        "1": "ds_databricks_dolly_15k",
+        "2": "ds_anthropic_hh_rlhf",
+        "3": "ds_samsum",
+        "4": "ds_squad",
+        "5": "ds_openai_humaneval",
+    }[str(dataset_id)]
+
+
+def _storage_version_id_for_display_id(dataset_id: str | int, dataset_version_id: str | int) -> str:
+    if str(dataset_version_id) != "1":
+        raise KeyError(f"Unknown dataset_version_id {dataset_version_id} for dataset_id {dataset_id}")
+    return {
+        "1": "dsv_databricks_dolly_15k_raw_v1_b66c4cf8e4",
+        "2": "dsv_anthropic_hh_rlhf_raw_v1_7b57e8e5e3",
+        "3": "dsv_samsum_raw_v1_89e5308a7f",
+        "4": "dsv_squad_raw_v1_825c43a962",
+        "5": "dsv_openai_humaneval_raw_v1_527d4f2ddd",
+    }[str(dataset_id)]
 
 
 def _source_url(source_dataset_name: str) -> str:

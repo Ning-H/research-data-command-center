@@ -34,25 +34,23 @@ def test_dataset_catalog_and_detail_api(tmp_path: Path) -> None:
         assert catalog_items[0]["name"] == "Databricks Dolly 15k"
         assert catalog_items[0]["record_count"] == 5
 
-        detail_response = client.get(f"/datasets/{result.dataset_id}")
+        detail_response = client.get("/datasets/1")
         assert detail_response.status_code == 200
         detail = detail_response.json()
-        assert detail["dataset_version_id"] == result.dataset_version_id
-        assert detail["dataset_id"] == result.dataset_id
+        assert detail["dataset_version_id"] == 1
+        assert detail["dataset_id"] == 1
         assert len(detail["sample_records"]) == 5
         assert {"input_text", "target_text", "question", "chosen_text", "rejected_text"}.issubset(
             detail["sample_records"][0]
         )
-        assert detail["sample_records"][0]["record_display_id"] == 1
-        assert "record_storage_key" in detail["sample_records"][0]
+        assert detail["sample_records"][0]["record_id"] == 1
+        assert "record_storage_key" not in detail["sample_records"][0]
         assert {metric["metric_name"] for metric in detail["quality_metrics"]} >= {
             "records.total",
             "tokens.mean",
         }
 
-        records_response = client.get(
-            f"/datasets/{result.dataset_id}/versions/{result.dataset_version_id}/records?limit=2"
-        )
+        records_response = client.get("/datasets/1/versions/1/records?limit=2")
         assert records_response.status_code == 200
         assert len(records_response.json()["items"]) == 2
     finally:
@@ -89,7 +87,7 @@ def test_dataset_api_filters_catalog_and_searches_records(tmp_path: Path) -> Non
         assert catalog_items[0]["name"] == "SAMSum Dialogue Summarization"
 
         records_response = client.get(
-            f"/datasets/{result.dataset_id}/versions/{result.dataset_version_id}/records?q=eval"
+            "/datasets/3/versions/1/records?q=eval"
         )
         assert records_response.status_code == 200
         records = records_response.json()["items"]
