@@ -113,20 +113,14 @@ def test_dataset_access_records_research_program_usage(tmp_path: Path) -> None:
         )
         assert access_response.status_code == 200
         access = access_response.json()
-        assert access["linked_dataset_ids"] == [1]
-        assert access["linked_dataset_versions"] == [
-            {"dataset_id": 1, "dataset_version_id": 1}
-        ]
+        assert access["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
 
         program = ResearchProgramRepository(
             duckdb_path=Path(result.duckdb_path),
             storage_root=tmp_path,
         ).get_program(1)
         assert program is not None
-        assert program["linked_dataset_ids"] == [1]
-        assert program["linked_dataset_versions"] == [
-            {"dataset_id": 1, "dataset_version_id": 1}
-        ]
+        assert program["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
     finally:
         app.dependency_overrides.clear()
 

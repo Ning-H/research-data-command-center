@@ -109,8 +109,7 @@ def _experiment_row(row: dict[str, Any]) -> dict[str, Any]:
         **experiment,
         "tags": _json_list(row.get("tags_json")),
         "variants": _json_list(row.get("variants_json")),
-        "linked_dataset_ids": _json_list(row.get("linked_dataset_ids_json")),
-        "linked_dataset_versions": _json_list(row.get("linked_dataset_versions_json")),
+        "linked_datasets": _json_list(row.get("linked_datasets_json")),
         "linked_run_ids": _json_list(row.get("linked_run_ids_json")),
         "linked_model_version_ids": _json_list(row.get("linked_model_version_ids_json")),
     }

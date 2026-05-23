@@ -114,8 +114,7 @@ def _program_row(row: dict[str, Any]) -> dict[str, Any]:
         **program,
         "researcher_names": _json_list(row.get("researcher_names_json")),
         "tags": _json_list(row.get("tags_json")),
-        "linked_dataset_ids": _json_list(row.get("linked_dataset_ids_json")),
-        "linked_dataset_versions": _json_list(row.get("linked_dataset_versions_json")),
+        "linked_datasets": _json_list(row.get("linked_datasets_json")),
         "linked_experiment_ids": _json_list(row.get("linked_experiment_ids_json")),
         "linked_run_ids": _json_list(row.get("linked_run_ids_json")),
     }

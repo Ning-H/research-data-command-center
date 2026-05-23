@@ -17,8 +17,7 @@ EXPERIMENT_STATUSES = {"planning", "active", "paused", "completed", "archived"}
 JSON_LIST_FIELDS = {
     "tags",
     "variants",
-    "linked_dataset_ids",
-    "linked_dataset_versions",
+    "linked_datasets",
     "linked_run_ids",
     "linked_model_version_ids",
 }
@@ -90,11 +89,11 @@ def register_experiment(storage_root: Path, payload: dict[str, Any]) -> Register
     _write_parquet([row], _experiment_path(storage_root, experiment_id))
     _write_json(row, _experiment_manifest_path(storage_root, experiment_id))
     register_experiment_duckdb_view(storage_root=storage_root, duckdb_path=duckdb_path)
+    linked_datasets = json.loads(row["linked_datasets_json"])
     attach_research_program_links(
         storage_root=storage_root,
         program_id=program_id,
-        dataset_ids=json.loads(row["linked_dataset_ids_json"]),
-        dataset_versions=json.loads(row["linked_dataset_versions_json"]),
+        dataset_versions=linked_datasets,
         experiment_ids=[experiment_id],
         updated_by_user_id=row["created_by_user_id"],
     )
@@ -145,11 +144,11 @@ def update_experiment(
         duckdb_path=storage_root / "duckdb" / "research_command_center.duckdb",
         replace_existing=True,
     )
+    linked_datasets = json.loads(updated["linked_datasets_json"])
     attach_research_program_links(
         storage_root=storage_root,
         program_id=int(updated["program_id"]),
-        dataset_ids=json.loads(updated["linked_dataset_ids_json"]),
-        dataset_versions=json.loads(updated["linked_dataset_versions_json"]),
+        dataset_versions=linked_datasets,
         experiment_ids=[experiment_id],
         run_ids=json.loads(updated["linked_run_ids_json"]),
         updated_by_user_id=updated["updated_by_user_id"],
@@ -193,8 +192,7 @@ def _normalize_experiment_row(payload: dict[str, Any]) -> dict[str, Any]:
     experiment_name = str(payload.get("experiment_name") or payload.get("name") or "").strip()
     if not experiment_name:
         raise ValueError("experiment_name is required")
-    linked_dataset_ids = [int(value) for value in _list_value(payload, "linked_dataset_ids")]
-    linked_dataset_versions = _dataset_version_refs(payload)
+    linked_datasets = _linked_dataset_refs(payload)
     return {
         "experiment_id": int(payload["experiment_id"]),
         "program_id": int(payload["program_id"]),
@@ -212,8 +210,7 @@ def _normalize_experiment_row(payload: dict[str, Any]) -> dict[str, Any]:
         "evaluation_plan": str(payload.get("evaluation_plan") or "").strip(),
         "tags_json": json.dumps(_string_list(payload, "tags"), sort_keys=True),
         "variants_json": json.dumps(_variant_list(payload), sort_keys=True),
-        "linked_dataset_ids_json": json.dumps(linked_dataset_ids, sort_keys=True),
-        "linked_dataset_versions_json": json.dumps(linked_dataset_versions, sort_keys=True),
+        "linked_datasets_json": json.dumps(linked_datasets, sort_keys=True),
         "linked_run_ids_json": json.dumps(
             [int(value) for value in _list_value(payload, "linked_run_ids")],
             sort_keys=True,
@@ -248,10 +245,10 @@ def _variant_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return normalized
 
 
-def _dataset_version_refs(payload: dict[str, Any]) -> list[dict[str, int]]:
-    raw_value = payload.get("linked_dataset_versions")
+def _linked_dataset_refs(payload: dict[str, Any]) -> list[dict[str, int]]:
+    raw_value = payload.get("linked_datasets")
     if raw_value is None:
-        raw_value = payload.get("linked_dataset_versions_json")
+        raw_value = payload.get("linked_datasets_json")
     if isinstance(raw_value, str) and raw_value:
         raw_value = json.loads(raw_value)
     if raw_value is None:

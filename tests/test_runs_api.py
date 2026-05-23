@@ -160,10 +160,7 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
             storage_root=tmp_path,
         ).get_program(1)
         assert program is not None
-        assert program["linked_dataset_ids"] == [1]
-        assert program["linked_dataset_versions"] == [
-            {"dataset_id": 1, "dataset_version_id": 1}
-        ]
+        assert program["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
         assert program["linked_experiment_ids"] == [1]
         assert program["linked_run_ids"] == [run_id]
 

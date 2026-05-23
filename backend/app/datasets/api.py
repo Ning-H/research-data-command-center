@@ -141,7 +141,6 @@ def record_dataset_access(
         "dataset_id": dataset_id,
         "dataset_version_id": dataset_version_id,
         "access_purpose": payload.get("access_purpose", "not_provided"),
-        "linked_dataset_ids": program["linked_dataset_ids"],
-        "linked_dataset_versions": program["linked_dataset_versions"],
+        "linked_datasets": program["linked_datasets"],
         "note": "Dataset usage recorded against the research program from an API access request.",
     }

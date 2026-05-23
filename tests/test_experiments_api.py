@@ -63,8 +63,7 @@ def test_experiments_can_be_registered_under_research_programs(tmp_path: Path) -
                         "data_recipe": "80% baseline + 20% outline-first study-guide data",
                     },
                 ],
-                "linked_dataset_ids": [1],
-                "linked_dataset_versions": [{"dataset_id": 1, "dataset_version_id": 1}],
+                "linked_datasets": [{"dataset_id": 1, "dataset_version_id": 1}],
                 "decision_notes": "First experiment under the program.",
             },
         )
@@ -79,8 +78,7 @@ def test_experiments_can_be_registered_under_research_programs(tmp_path: Path) -
         assert detail["program_id"] == 1
         assert detail["experiment_name"] == "Outline-first algorithm study-guide data recipe"
         assert detail["research_question"].startswith("Does outline-first")
-        assert detail["linked_dataset_ids"] == [1]
-        assert detail["linked_dataset_versions"] == [{"dataset_id": 1, "dataset_version_id": 1}]
+        assert detail["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
         assert detail["variants"][1]["variant_name"] == "outline_first_guides"
         assert detail["ui_workflow"]["can_update_from_ui"] is True
         assert "attach_training_runs" in detail["ui_workflow"]["supported_actions"]
@@ -109,10 +107,7 @@ def test_experiments_can_be_registered_under_research_programs(tmp_path: Path) -
 
         program = ResearchProgramRepository(duckdb_path=duckdb_path, storage_root=tmp_path).get_program(1)
         assert program is not None
-        assert program["linked_dataset_ids"] == [1]
-        assert program["linked_dataset_versions"] == [
-            {"dataset_id": 1, "dataset_version_id": 1}
-        ]
+        assert program["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
         assert program["linked_experiment_ids"] == [1]
         assert program["linked_run_ids"] == [7]
     finally:

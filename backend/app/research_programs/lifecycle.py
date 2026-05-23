@@ -15,8 +15,7 @@ PROGRAM_STATUSES = {"planning", "active", "paused", "completed", "archived"}
 JSON_LIST_FIELDS = {
     "researcher_names",
     "tags",
-    "linked_dataset_ids",
-    "linked_dataset_versions",
+    "linked_datasets",
     "linked_experiment_ids",
     "linked_run_ids",
 }
@@ -173,8 +172,7 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("program_name is required")
     researcher_names = _string_list(payload, "researcher_names")
     tags = _string_list(payload, "tags")
-    linked_dataset_ids = [int(value) for value in _list_value(payload, "linked_dataset_ids")]
-    linked_dataset_versions = _dataset_version_refs(payload)
+    linked_datasets = _linked_dataset_refs(payload)
     linked_experiment_ids = [int(value) for value in _list_value(payload, "linked_experiment_ids")]
     linked_run_ids = [int(value) for value in _list_value(payload, "linked_run_ids")]
     return {
@@ -193,8 +191,7 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
         "owner_name": str(payload.get("owner_name") or "").strip(),
         "researcher_names_json": json.dumps(researcher_names, sort_keys=True),
         "tags_json": json.dumps(tags, sort_keys=True),
-        "linked_dataset_ids_json": json.dumps(linked_dataset_ids, sort_keys=True),
-        "linked_dataset_versions_json": json.dumps(linked_dataset_versions, sort_keys=True),
+        "linked_datasets_json": json.dumps(linked_datasets, sort_keys=True),
         "linked_experiment_ids_json": json.dumps(linked_experiment_ids, sort_keys=True),
         "linked_run_ids_json": json.dumps(linked_run_ids, sort_keys=True),
         "decision_notes": str(payload.get("decision_notes") or "").strip(),
@@ -228,14 +225,11 @@ def attach_research_program_links(
     if frame.empty:
         raise ValueError(f"program_id {program_id} does not exist")
     current = frame.iloc[0].to_dict()
+    incoming_datasets = _linked_dataset_refs({"linked_datasets": dataset_versions or []})
     updates = {
-        "linked_dataset_ids": _merge_ints(
-            _list_value(current, "linked_dataset_ids"),
-            dataset_ids or [],
-        ),
-        "linked_dataset_versions": _merge_dataset_version_refs(
-            _dataset_version_refs(current),
-            dataset_versions or [],
+        "linked_datasets": _merge_dataset_refs(
+            _linked_dataset_refs(current),
+            incoming_datasets,
         ),
         "linked_experiment_ids": _merge_ints(
             _list_value(current, "linked_experiment_ids"),
@@ -248,8 +242,7 @@ def attach_research_program_links(
     updated = update_research_program(storage_root=storage_root, program_id=program_id, payload=updates)
     return {
         **updated,
-        "linked_dataset_ids": json.loads(updated["linked_dataset_ids_json"]),
-        "linked_dataset_versions": json.loads(updated["linked_dataset_versions_json"]),
+        "linked_datasets": json.loads(updated["linked_datasets_json"]),
         "linked_experiment_ids": json.loads(updated["linked_experiment_ids_json"]),
         "linked_run_ids": json.loads(updated["linked_run_ids_json"]),
     }
@@ -261,7 +254,7 @@ def _merge_ints(existing: list[Any], additions: list[int]) -> list[int]:
     return sorted(merged)
 
 
-def _merge_dataset_version_refs(
+def _merge_dataset_refs(
     existing: list[dict[str, int]],
     additions: list[dict[str, int]],
 ) -> list[dict[str, int]]:
@@ -275,10 +268,10 @@ def _merge_dataset_version_refs(
     ]
 
 
-def _dataset_version_refs(payload: dict[str, Any]) -> list[dict[str, int]]:
-    raw_value = payload.get("linked_dataset_versions")
+def _linked_dataset_refs(payload: dict[str, Any]) -> list[dict[str, int]]:
+    raw_value = payload.get("linked_datasets")
     if raw_value is None:
-        raw_value = payload.get("linked_dataset_versions_json")
+        raw_value = payload.get("linked_datasets_json")
     if isinstance(raw_value, str) and raw_value:
         raw_value = json.loads(raw_value)
     if raw_value is None:
