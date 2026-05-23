@@ -30,6 +30,8 @@ The MVP score uses a weighted, auditable formula:
 
 Required-field completeness is weighted highest because a dataset with missing purpose-critical fields cannot safely move into runs or evals.
 
+Scores are floored to whole numbers so a small issue cannot round a dataset up to a perfect `100/100`.
+
 ## Null Value Policy
 
 Nulls are part of quality, but they must be interpreted by dataset purpose.

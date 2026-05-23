@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { getDataset } from "../../../lib/api";
+import { getDataset, type DatasetDetail } from "../../../lib/api";
 
 type DatasetDetailPageProps = {
   params: {
@@ -83,6 +83,8 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
         </div>
       </div>
 
+      <QualityPanel dataset={dataset} />
+
       <div className="two-column">
         <div className="panel">
           <div>
@@ -105,84 +107,6 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
                 {record.target_text ? <RecordBlock label="Target" value={record.target_text} /> : null}
               </article>
             ))}
-          </div>
-        </div>
-
-        <div className="panel">
-          <div>
-            <h2>Quality</h2>
-            <p className="subtle">{dataset.quality_summary.meaning}</p>
-          </div>
-          <div className="quality-note">
-            <div>
-              <span className={qualityBadgeClass(dataset.quality_summary.score)}>
-                {dataset.quality_summary.score}/100 · {dataset.quality_summary.score_label}
-              </span>
-            </div>
-            <p>{dataset.quality_summary.score_explanation}</p>
-            <p>{dataset.quality_summary.null_value_policy}</p>
-            <p>
-              Framework: {dataset.quality_summary.framework}
-            </p>
-            <div className="muted-row">
-              Required fields: {dataset.quality_summary.required_fields.join(", ")} · null values measured:{" "}
-              {dataset.quality_summary.total_null_values.toLocaleString()} across{" "}
-              {dataset.quality_summary.fields_with_nulls.toLocaleString()} fields
-            </div>
-          </div>
-          <div className="quality-checks">
-            {dataset.quality_summary.checks.map((check) => (
-              <div className="quality-check" key={check.metric_name}>
-                <div>
-                  <strong>{check.name}</strong>
-                  <span className={check.status === "ok" ? "badge" : check.status === "review" ? "badge warning" : "badge neutral"}>
-                    {check.status}
-                  </span>
-                </div>
-                <p>{check.description}</p>
-                <div className="muted-row">
-                  {check.metric_name}: {formatMetric(check.metric_value)}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Score component</th>
-                  <th>Weight</th>
-                  <th>Meaning</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dataset.quality_summary.score_components.map((component) => (
-                  <tr key={component.name}>
-                    <td>{component.name}</td>
-                    <td>{component.weight}</td>
-                    <td>{component.description}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Metric</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dataset.quality_metrics.map((metric) => (
-                  <tr key={metric.metric_name}>
-                    <td>{metric.metric_name}</td>
-                    <td>{formatMetric(metric.metric_value)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
@@ -237,6 +161,83 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
         </div>
       </div>
     </section>
+  );
+}
+
+function QualityPanel({ dataset }: { dataset: DatasetDetail }) {
+  return (
+    <div className="panel quality-panel">
+      <div className="quality-header">
+        <div>
+          <h2>Quality</h2>
+          <p className="subtle">{dataset.quality_summary.meaning}</p>
+        </div>
+        <div className="score-card">
+          <span>quality_score</span>
+          <strong>{dataset.quality_summary.score}/100</strong>
+          <p>{dataset.quality_summary.score_label}</p>
+        </div>
+      </div>
+
+      <div className="quality-note">
+        <span className={qualityBadgeClass(dataset.quality_summary.score)}>
+          {dataset.quality_summary.score_label}
+        </span>
+        <p>{dataset.quality_summary.score_explanation}</p>
+        <p>{dataset.quality_summary.null_value_policy}</p>
+        <div className="muted-row">
+          Required fields: {dataset.quality_summary.required_fields.join(", ")} · null values measured:{" "}
+          {dataset.quality_summary.total_null_values.toLocaleString()} across{" "}
+          {dataset.quality_summary.fields_with_nulls.toLocaleString()} fields
+        </div>
+      </div>
+
+      <div className="quality-checks">
+        {dataset.quality_summary.checks.map((check) => (
+          <div className="quality-check" key={check.metric_name}>
+            <div>
+              <strong>{check.name}</strong>
+              <span className={check.status === "ok" ? "badge" : check.status === "review" ? "badge warning" : "badge neutral"}>
+                {check.status}
+              </span>
+            </div>
+            <p>{check.description}</p>
+            <div className="muted-row">
+              {check.metric_name}: {formatMetric(check.metric_value)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="component-grid">
+        {dataset.quality_summary.score_components.map((component) => (
+          <div className="component-card" key={component.name}>
+            <span>{component.weight} pts</span>
+            <strong>{component.name}</strong>
+            <p>{component.description}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="table-wrap compact-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dataset.quality_metrics.map((metric) => (
+              <tr key={metric.metric_name}>
+                <td>{metric.metric_name}</td>
+                <td>{formatMetric(metric.metric_value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

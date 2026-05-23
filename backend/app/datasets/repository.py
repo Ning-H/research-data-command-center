@@ -497,7 +497,7 @@ def _quality_score_from_values(
     duplicate_score = 15 * max(0.0, 1 - (duplicate_count / records_total))
     pii_score = 15 * max(0.0, 1 - (pii_match_count / records_total))
     profile_score = 10 if profile_available else 0
-    return max(1, min(100, round(required_score + duplicate_score + pii_score + profile_score)))
+    return max(1, min(100, int(required_score + duplicate_score + pii_score + profile_score)))
 
 
 def _quality_label(score: int) -> str:

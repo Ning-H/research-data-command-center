@@ -257,6 +257,10 @@ tr:last-child td {
   grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
 }
 
+.two-column > .panel:only-child {
+  grid-column: 1 / -1;
+}
+
 .record-list {
   display: grid;
   gap: 12px;
@@ -351,6 +355,7 @@ tr:last-child td {
 .quality-checks {
   display: grid;
   gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .quality-check > div:first-child {
@@ -358,6 +363,74 @@ tr:last-child td {
   display: flex;
   gap: 10px;
   justify-content: space-between;
+}
+
+.quality-panel {
+  gap: 14px;
+}
+
+.quality-header {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 180px;
+}
+
+.score-card {
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+}
+
+.score-card span,
+.component-card span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.score-card strong {
+  color: var(--success);
+  font-size: 30px;
+  line-height: 1;
+}
+
+.score-card p {
+  color: #166534;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.component-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.component-card {
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.component-card strong {
+  font-size: 13px;
+}
+
+.component-card p {
+  color: #526173;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.compact-table table {
+  min-width: 0;
 }
 
 .placeholder-grid {
@@ -384,10 +457,27 @@ tr:last-child td {
     padding: 20px;
   }
 
-  .summary-grid,
   .two-column,
+  .quality-header {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid,
   .placeholder-grid,
-  .metadata-grid {
+  .metadata-grid,
+  .quality-checks,
+  .component-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .summary-grid,
+  .placeholder-grid,
+  .metadata-grid,
+  .quality-checks,
+  .component-grid,
+  .nav-list {
     grid-template-columns: 1fr;
   }
 }
