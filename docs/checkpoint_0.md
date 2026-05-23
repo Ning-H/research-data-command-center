@@ -7,23 +7,31 @@ After owner confirmation, Phase 1 starts with detailed research/design plans for
 ## Confirmed Product Direction
 
 - Product name: Research Data Command Center.
-- Product position: researcher-facing internal data platform for AI research workflows.
+- Product position: lineage-first internal research operations platform for AI research lifecycles.
+- Active direction doc: `docs/research_lifecycle_command_center.md`.
 - Final navigation:
 
 ```text
 Research Data Command Center
 ├── Home
-├── Datasets
-├── Runs
-├── Models & Evaluations
+├── Research Programs
+├── Data Assets
+├── Experiments
+├── Training Runs
+├── Models & Checkpoints
+├── Evaluations
+├── Inference Observability
+├── Failure Library
+├── Dataset Iterations
 ├── Workspace
 ├── Docs
 └── Settings
 ```
 
-- Dataset lineage belongs inside Datasets.
-- Run lineage belongs inside Runs.
-- Model lineage belongs inside Models & Evaluations.
+- Data lineage belongs inside Data Assets and Dataset Iterations.
+- Run lineage belongs inside Training Runs.
+- Model lineage belongs inside Models & Checkpoints.
+- Eval, inference, and failure lineage belongs inside Evaluations, Inference Observability, and Failure Library.
 - API and SDK documentation belongs under Docs, not as a top-level product pillar.
 
 ## Specialist Agents

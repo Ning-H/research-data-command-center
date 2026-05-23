@@ -16,11 +16,11 @@ export default async function RunsPage() {
     <section className="page">
       <div className="page-header">
         <div>
-          <p className="eyebrow">Runs</p>
-          <h1>Research Run Records</h1>
+          <p className="eyebrow">Training Runs</p>
+          <h1>Training Run Records</h1>
           <p className="subtle">
             Researchers train wherever they already train. Their scripts save raw run events,
-            checkpoint metadata, and configs here for normalization, lineage, and analysis.
+            checkpoint metadata, run type, and configs here for normalization, lineage, and analysis.
           </p>
         </div>
         <div className="action-row">
@@ -57,7 +57,8 @@ export default async function RunsPage() {
           <p className="subtle">
             This app does not launch the training job. It receives raw logs and metadata from
             researcher-owned jobs, then processes them into canonical metrics, checkpoints, health
-            summaries, and lineage.
+            summaries, and lineage. Future run types include pretraining, continued pretraining,
+            SFT, DPO, RLHF, RLAIF, reward-model training, distillation, and finetuning.
           </p>
         </div>
         <div className="component-grid">

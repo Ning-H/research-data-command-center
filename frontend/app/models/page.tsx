@@ -14,11 +14,11 @@ export default async function ModelsPage() {
     <section className="page">
       <div className="page-header">
         <div>
-          <p className="eyebrow">Models & Evaluations</p>
+          <p className="eyebrow">Models & Checkpoints</p>
           <h1>Model Registry</h1>
           <p className="subtle">
             Register candidate model versions from promoted checkpoints. Each model version keeps
-            the checkpoint, run, dataset, and artifact lineage needed for later evaluation.
+            the checkpoint, training run, data asset, and artifact lineage needed for later evaluation.
           </p>
         </div>
         <Link className="button secondary" href="/runs/checkpoints">
@@ -50,8 +50,8 @@ export default async function ModelsPage() {
         <div>
           <h2>Registry Boundary</h2>
           <p className="subtle">
-            Researchers choose a checkpoint to register. The platform derives the run and dataset
-            lineage from `checkpoint_id`, then stores immutable model-version metadata.
+            Researchers choose a checkpoint to register. The platform derives the training run and
+            data asset lineage from `checkpoint_id`, then stores immutable model-version metadata.
           </p>
         </div>
         <div className="component-grid">

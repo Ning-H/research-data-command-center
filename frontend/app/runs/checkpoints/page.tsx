@@ -16,7 +16,7 @@ export default async function CheckpointsPage({ searchParams = {} }: Checkpoints
     <section className="page">
       <div className="page-header">
         <div>
-          <p className="eyebrow">Runs / Checkpoints</p>
+          <p className="eyebrow">Training Runs / Checkpoints</p>
           <h1>Checkpoint Search</h1>
           <p className="subtle">
             Compare checkpoints across completed runs that used the same governed dataset,
@@ -24,8 +24,8 @@ export default async function CheckpointsPage({ searchParams = {} }: Checkpoints
             selected ranking rule.
           </p>
         </div>
-        <Link className="button secondary" href="/runs">
-          Runs
+        <Link className="button secondary" href="/training-runs">
+          Training Runs
           <ArrowRight aria-hidden="true" size={16} />
         </Link>
       </div>

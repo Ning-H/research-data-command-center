@@ -15,7 +15,7 @@ export default function PromoteCheckpointPage({ searchParams = {} }: PromotePage
     <section className="page">
       <div className="page-header">
         <div>
-          <p className="eyebrow">Models & Evaluations / Register</p>
+          <p className="eyebrow">Models & Checkpoints / Register</p>
           <h1>Promote Checkpoint</h1>
           <p className="subtle">
             Create an immutable model version from a checkpoint. The API derives run and dataset

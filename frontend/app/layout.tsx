@@ -1,10 +1,16 @@
 import {
+  Activity,
   BookOpen,
-  Bot,
+  Boxes,
+  BrainCircuit,
+  ClipboardCheck,
   Database,
   FileText,
+  FlaskConical,
   Home,
   LineChart,
+  Library,
+  RefreshCw,
   Settings,
   Workflow,
 } from "lucide-react";
@@ -15,9 +21,15 @@ import "./styles.css";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
-  { href: "/datasets", label: "Datasets", icon: Database },
-  { href: "/runs", label: "Runs", icon: LineChart },
-  { href: "/models", label: "Models & Evaluations", icon: Bot },
+  { href: "/research-programs", label: "Research Programs", icon: BrainCircuit },
+  { href: "/data-assets", label: "Data Assets", icon: Database },
+  { href: "/experiments", label: "Experiments", icon: FlaskConical },
+  { href: "/training-runs", label: "Training Runs", icon: LineChart },
+  { href: "/models-checkpoints", label: "Models & Checkpoints", icon: Boxes },
+  { href: "/evaluations", label: "Evaluations", icon: ClipboardCheck },
+  { href: "/inference-observability", label: "Inference Observability", icon: Activity },
+  { href: "/failure-library", label: "Failure Library", icon: Library },
+  { href: "/dataset-iterations", label: "Dataset Iterations", icon: RefreshCw },
   { href: "/workspace", label: "Workspace", icon: Workflow },
   { href: "/docs", label: "Docs", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -25,7 +37,7 @@ const navItems = [
 
 export const metadata = {
   title: "Research Data Command Center",
-  description: "Research data platform for datasets, runs, models, and evaluations.",
+  description: "Lineage-first research operations platform for AI research lifecycles.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

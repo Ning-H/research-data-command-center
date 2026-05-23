@@ -33,7 +33,7 @@ a {
 
 .app-shell {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 310px minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -67,6 +67,10 @@ a {
   gap: 10px;
   min-height: 38px;
   padding: 9px 10px;
+}
+
+.nav-item span {
+  line-height: 1.25;
 }
 
 .nav-item:hover {

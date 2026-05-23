@@ -37,9 +37,9 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
             and lineage. Training and checkpoint file creation happened outside this platform.
           </p>
         </div>
-        <Link className="button secondary" href="/runs">
+        <Link className="button secondary" href="/training-runs">
           <ArrowLeft aria-hidden="true" size={16} />
-          Runs
+          Training Runs
         </Link>
       </div>
 

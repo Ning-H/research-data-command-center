@@ -4,14 +4,21 @@ Status: **master product guideline**
 
 This document is the project-level guide for AI-assisted design and build work. It supersedes earlier product/menu guidance, while `docs/shared_data_contract.md` remains the stricter engineering contract for shared identifiers, storage boundaries, lineage, and schema discipline.
 
+Update: the active product direction is the broader Research Lifecycle Command
+Center described in `docs/research_lifecycle_command_center.md`. The original
+Dataset / Runs / Models agent split remains useful implementation history, but
+future work should use the expanded lifecycle navigation and entity model.
+
 ## Product Direction
 
-Research Data Command Center is a researcher-facing platform for managing, observing, and analyzing AI research data workflows.
+Research Data Command Center is a researcher-facing platform for managing, observing, and analyzing AI research lifecycle workflows.
 
 It connects:
 
 ```text
-Datasets -> Training Runs -> Checkpoints -> Model Versions -> Evaluations -> Failures -> Next Dataset / Next Run
+Research Program -> Hypothesis -> Data Assets -> Data Mixtures -> Experiments
+-> Training Runs -> Checkpoints -> Model Versions -> Evaluation Runs
+-> Inference Traces -> Failure Cases -> Dataset Candidates -> Next Experiment
 ```
 
 The product should feel like an internal research data platform for technical researchers, ML platform engineers, and data platform teams. It should not feel like a generic dashboard.
@@ -21,9 +28,15 @@ The product should feel like an internal research data platform for technical re
 ```text
 Research Data Command Center
 ├── Home
-├── Datasets
-├── Runs
-├── Models & Evaluations
+├── Research Programs
+├── Data Assets
+├── Experiments
+├── Training Runs
+├── Models & Checkpoints
+├── Evaluations
+├── Inference Observability
+├── Failure Library
+├── Dataset Iterations
 ├── Workspace
 ├── Docs
 └── Settings
@@ -31,9 +44,10 @@ Research Data Command Center
 
 Rules:
 
-- Dataset lineage belongs inside Datasets.
-- Run lineage belongs inside Runs.
-- Model lineage belongs inside Models & Evaluations.
+- Data lineage belongs inside Data Assets and Dataset Iterations.
+- Run lineage belongs inside Training Runs.
+- Model lineage belongs inside Models & Checkpoints.
+- Eval, inference, and failure lineage belongs inside Evaluations, Inference Observability, and Failure Library.
 - API and SDK documentation belongs under Docs, not as a top-level product pillar.
 
 ## Core Data Domains
