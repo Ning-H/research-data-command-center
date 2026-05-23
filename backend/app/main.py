@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.datasets.api import router as datasets_router
+from app.experiments.api import router as experiments_router
 from app.models.api import router as models_router
 from app.research_programs.api import router as research_programs_router
 from app.runs.api import checkpoints_router, router as runs_router
@@ -19,6 +20,7 @@ app = FastAPI(
 
 app.include_router(datasets_router)
 app.include_router(research_programs_router)
+app.include_router(experiments_router)
 app.include_router(runs_router)
 app.include_router(checkpoints_router)
 app.include_router(models_router)

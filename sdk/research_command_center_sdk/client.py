@@ -31,6 +31,40 @@ class ResearchCommandCenterClient:
     def get_research_program(self, program_id: str | int) -> dict[str, Any]:
         return self._get(f"/research-programs/{program_id}")
 
+    def register_research_program(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post("/research-programs", payload)
+
+    def update_research_program(
+        self,
+        program_id: str | int,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._patch(f"/research-programs/{program_id}", payload)
+
+    def list_experiments(
+        self,
+        program_id: str | int | None = None,
+        tag: str | None = None,
+        q: str | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+        params = {"program_id": program_id, "tag": tag, "q": q, "status": status}
+        query = str(httpx.QueryParams({key: value for key, value in params.items() if value is not None}))
+        return self._get(f"/experiments?{query}")
+
+    def register_experiment(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post("/experiments", payload)
+
+    def get_experiment(self, experiment_id: str | int) -> dict[str, Any]:
+        return self._get(f"/experiments/{experiment_id}")
+
+    def update_experiment(
+        self,
+        experiment_id: str | int,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._patch(f"/experiments/{experiment_id}", payload)
+
     def get_dataset(self, dataset_id: str) -> dict[str, Any]:
         return self._get(f"/datasets/{dataset_id}")
 
@@ -156,5 +190,11 @@ class ResearchCommandCenterClient:
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
             response = client.post(path, json=payload)
+            response.raise_for_status()
+            return response.json()
+
+    def _patch(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
+            response = client.patch(path, json=payload)
             response.raise_for_status()
             return response.json()
