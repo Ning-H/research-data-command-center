@@ -2,6 +2,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app.experiments.lifecycle import register_experiment
+from app.experiments.repository import ExperimentRepository
 from app.main import app
 from app.research_programs.lifecycle import register_research_program
 from app.research_programs.repository import ResearchProgramRepository
@@ -76,6 +78,20 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
             "researcher_names": ["Lena Keys"],
         },
     )
+    register_experiment(
+        storage_root=tmp_path,
+        payload={
+            "program_id": 1,
+            "experiment_name": "Run registration experiment",
+            "experiment_description": "Validate run-to-experiment linkage.",
+            "research_question": "Can externally reported runs attach to an experiment?",
+            "hypothesis": "A run that provides experiment_id should update experiment lineage.",
+            "experiment_type": "run_lineage_validation",
+            "status": "active",
+            "owner_name": "Lena Keys",
+            "linked_datasets": [{"dataset_id": 1, "dataset_version_id": 1}],
+        },
+    )
 
     def override_repository() -> RunRepository:
         return RunRepository(
@@ -87,11 +103,30 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
     app.dependency_overrides[get_run_storage_root] = lambda: tmp_path
     try:
         client = TestClient(app)
+        missing_experiment_response = client.post(
+            "/runs/register",
+            json={
+                "run_name": "missing-experiment-id",
+                "program_id": 1,
+                "dataset_id": 1,
+                "dataset_version_id": 1,
+                "base_model_name": "numpy-softmax-text-classifier",
+                "training_task": "instruction_category_classification",
+                "research_intent": "Exercise validation.",
+                "owner_user_id": "user_test",
+                "training_environment": "local_test_process",
+                "artifact_root_uri": "storage/object_store/test/run-missing-experiment",
+            },
+        )
+        assert missing_experiment_response.status_code == 400
+        assert "experiment_id is required" in missing_experiment_response.json()["detail"]
+
         register_response = client.post(
             "/runs/register",
             json={
                 "run_name": "api-registered-real-run",
                 "program_id": 1,
+                "experiment_id": 1,
                 "dataset_id": 1,
                 "dataset_version_id": 1,
                 "base_model_name": "numpy-softmax-text-classifier",
@@ -107,6 +142,7 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
         run_id = register_response.json()["run_id"]
         assert run_id == 1
         assert register_response.json()["program_id"] == 1
+        assert register_response.json()["experiment_id"] == 1
 
         event_response = client.post(
             f"/runs/{run_id}/events",
@@ -163,6 +199,14 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
         assert program["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
         assert program["linked_experiment_ids"] == [1]
         assert program["linked_run_ids"] == [run_id]
+
+        experiment = ExperimentRepository(
+            duckdb_path=tmp_path / "duckdb" / "research_command_center.duckdb",
+            storage_root=tmp_path,
+        ).get_experiment(1)
+        assert experiment is not None
+        assert experiment["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
+        assert experiment["linked_run_ids"] == [run_id]
 
         search_response = client.get(
             "/checkpoints",

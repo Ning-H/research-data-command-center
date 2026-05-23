@@ -10,6 +10,7 @@ import duckdb
 import pandas as pd
 
 from app.datasets.repository import _storage_dataset_id_for_display_id, _storage_version_id_for_display_id
+from app.experiments.lifecycle import attach_experiment_links, get_experiment_program_id
 from app.research_programs.lifecycle import attach_research_program_links, research_program_exists
 from app.runs.ingestion import register_run_duckdb_views
 from research_command_center_contract.enums import CheckpointStatus, RunStatus, SourcePriority
@@ -20,6 +21,7 @@ class RegisteredRun:
     run_id: int
     run_config_id: int
     program_id: int | None
+    experiment_id: int | None
     dataset_id: int
     dataset_version_id: int
     status: str
@@ -47,6 +49,11 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
     program_id = int(payload["program_id"]) if payload.get("program_id") is not None else None
     if program_id is not None and not research_program_exists(storage_root, program_id):
         raise ValueError(f"program_id {program_id} does not exist")
+    experiment_id, program_id = _resolve_experiment_context(
+        storage_root=storage_root,
+        payload=payload,
+        program_id=program_id,
+    )
 
     duckdb_path = storage_root / "duckdb" / "research_command_center.duckdb"
     register_run_duckdb_views(storage_root=storage_root, duckdb_path=duckdb_path)
@@ -67,6 +74,7 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
                 "run_id": run_id,
                 "timestamp": started_at,
                 "program_id": program_id,
+                "experiment_id": experiment_id,
                 "dataset_id": dataset_id,
                 "dataset_version_id": dataset_version_id,
                 "run_name": payload["run_name"],
@@ -84,6 +92,7 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
             "run_id": run_id,
             "run_config_id": run_config_id,
             "program_id": program_id,
+            "experiment_id": experiment_id,
             "dataset_id": dataset_id,
             "dataset_version_id": dataset_version_id,
             "raw_events_uri": str(raw_path),
@@ -115,7 +124,7 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
             {
                 "run_id": run_id,
                 "program_id": program_id,
-                "experiment_id": int(payload.get("experiment_id", 1)),
+                "experiment_id": experiment_id,
                 "run_config_id": run_config_id,
                 "dataset_id": dataset_id,
                 "dataset_version_id": dataset_version_id,
@@ -144,15 +153,23 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
         _training_run_path(storage_root, run_id),
     )
     register_run_duckdb_views(storage_root=storage_root, duckdb_path=duckdb_path)
-    if program_id is not None:
+    if experiment_id is not None:
+        attach_experiment_links(
+            storage_root=storage_root,
+            experiment_id=experiment_id,
+            linked_datasets=[
+                {"dataset_id": dataset_id, "dataset_version_id": dataset_version_id}
+            ],
+            run_ids=[run_id],
+            updated_by_user_id=created_by_user_id,
+        )
+    elif program_id is not None:
         attach_research_program_links(
             storage_root=storage_root,
             program_id=program_id,
-            dataset_ids=[dataset_id],
             dataset_versions=[
                 {"dataset_id": dataset_id, "dataset_version_id": dataset_version_id}
             ],
-            experiment_ids=[int(payload.get("experiment_id", 1))],
             run_ids=[run_id],
             updated_by_user_id=created_by_user_id,
         )
@@ -160,6 +177,7 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
         run_id=run_id,
         run_config_id=run_config_id,
         program_id=program_id,
+        experiment_id=experiment_id,
         dataset_id=dataset_id,
         dataset_version_id=dataset_version_id,
         status=RunStatus.RUNNING.value,
@@ -266,6 +284,27 @@ def complete_run(storage_root: Path, run_id: int, payload: dict[str, Any]) -> Co
         duckdb_path=storage_root / "duckdb" / "research_command_center.duckdb",
     )
     return CompleteRunResult(run_id=run_id, status=status, ended_at=ended_at)
+
+
+def _resolve_experiment_context(
+    storage_root: Path,
+    payload: dict[str, Any],
+    program_id: int | None,
+) -> tuple[int | None, int | None]:
+    if payload.get("experiment_id") is None:
+        if program_id is not None:
+            raise ValueError("experiment_id is required when program_id is provided")
+        return None, program_id
+    experiment_id = int(payload["experiment_id"])
+    experiment_program_id = get_experiment_program_id(storage_root, experiment_id)
+    if experiment_program_id is None:
+        raise ValueError(f"experiment_id {experiment_id} does not exist")
+    if program_id is not None and program_id != experiment_program_id:
+        raise ValueError(
+            f"experiment_id {experiment_id} belongs to program_id {experiment_program_id}, "
+            f"not program_id {program_id}"
+        )
+    return experiment_id, experiment_program_id
 
 
 def _validate_registered_dataset(storage_root: Path, dataset_id: int, dataset_version_id: int) -> None:

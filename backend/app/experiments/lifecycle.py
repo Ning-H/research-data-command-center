@@ -61,6 +61,13 @@ def experiment_exists(storage_root: Path, experiment_id: int) -> bool:
     return _experiment_path(storage_root, experiment_id).exists()
 
 
+def get_experiment_program_id(storage_root: Path, experiment_id: int) -> int | None:
+    frame = _read_parquet_if_exists(_experiment_path(storage_root, experiment_id))
+    if frame.empty:
+        return None
+    return int(frame.iloc[0]["program_id"])
+
+
 def register_experiment(storage_root: Path, payload: dict[str, Any]) -> RegisteredExperiment:
     program_id = int(payload["program_id"])
     if not research_program_exists(storage_root, program_id):
@@ -209,6 +216,39 @@ def append_experiment_note(
     )
 
 
+def attach_experiment_links(
+    storage_root: Path,
+    experiment_id: int,
+    linked_datasets: list[dict[str, int]] | None = None,
+    run_ids: list[int] | None = None,
+    model_version_ids: list[int] | None = None,
+    updated_by_user_id: str | None = None,
+) -> dict[str, Any]:
+    path = _experiment_path(storage_root, experiment_id)
+    frame = _read_parquet_if_exists(path)
+    if frame.empty:
+        raise ValueError(f"experiment_id {experiment_id} does not exist")
+    current = frame.iloc[0].to_dict()
+    payload: dict[str, Any] = {
+        "linked_datasets": _merge_dataset_refs(
+            _linked_dataset_refs(current),
+            linked_datasets or [],
+        ),
+        "linked_run_ids": _merge_ints(_list_value(current, "linked_run_ids"), run_ids or []),
+        "linked_model_version_ids": _merge_ints(
+            _list_value(current, "linked_model_version_ids"),
+            model_version_ids or [],
+        ),
+    }
+    if updated_by_user_id:
+        payload["updated_by_user_id"] = updated_by_user_id
+    return update_experiment(
+        storage_root=storage_root,
+        experiment_id=experiment_id,
+        payload=payload,
+    )
+
+
 def register_experiment_duckdb_view(
     storage_root: Path,
     duckdb_path: Path,
@@ -332,6 +372,26 @@ def _next_note_id(notes: list[dict[str, Any]]) -> int:
     if not notes:
         return 1
     return max(int(note["note_id"]) for note in notes) + 1
+
+
+def _merge_ints(existing: list[Any], additions: list[int]) -> list[int]:
+    merged = {int(value) for value in existing}
+    merged.update(int(value) for value in additions)
+    return sorted(merged)
+
+
+def _merge_dataset_refs(
+    existing: list[dict[str, int]],
+    additions: list[dict[str, int]],
+) -> list[dict[str, int]]:
+    refs = {
+        (int(ref["dataset_id"]), int(ref["dataset_version_id"]))
+        for ref in [*existing, *additions]
+    }
+    return [
+        {"dataset_id": dataset_id, "dataset_version_id": dataset_version_id}
+        for dataset_id, dataset_version_id in sorted(refs)
+    ]
 
 
 def _linked_dataset_refs(payload: dict[str, Any]) -> list[dict[str, int]]:

@@ -64,6 +64,7 @@ def register_training_run(
         "run_id": result.run_id,
         "run_config_id": result.run_config_id,
         "program_id": result.program_id,
+        "experiment_id": result.experiment_id,
         "dataset_id": result.dataset_id,
         "dataset_version_id": result.dataset_version_id,
         "status": result.status,
