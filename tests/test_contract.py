@@ -9,6 +9,7 @@ from research_command_center_contract import (
 
 def test_required_canonical_keys_are_present() -> None:
     required = {
+        "program_id",
         "dataset_id",
         "dataset_version_id",
         "run_id",
@@ -62,6 +63,7 @@ def test_dataset_agent_tables_are_registered_after_checkpoint_2_approval() -> No
     analytical_tables = {table.name for table in ANALYTICAL_TABLES}
 
     assert {"datasets", "dataset_ingestion_jobs"}.issubset(metadata_tables)
+    assert "research_programs" in metadata_tables
     assert {
         "dataset_records",
         "dataset_schema_profiles",
@@ -75,6 +77,7 @@ def test_dataset_agent_tables_are_registered_after_checkpoint_2_approval() -> No
 def test_core_lineage_tables_keep_foreign_keys_explicit() -> None:
     tables = {table.name: table for table in (*APP_METADATA_TABLES, *ANALYTICAL_TABLES)}
 
+    assert "program_id" in tables["research_programs"].columns
     assert {"run_id", "dataset_version_id"}.issubset(tables["checkpoints"].columns)
     assert {"checkpoint_id", "run_id", "dataset_id", "dataset_version_id"}.issubset(
         tables["model_versions"].columns

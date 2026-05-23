@@ -1,6 +1,7 @@
 """Canonical identifier names shared across all agents."""
 
 CANONICAL_KEYS: tuple[str, ...] = (
+    "program_id",
     "dataset_id",
     "dataset_version_id",
     "run_id",
