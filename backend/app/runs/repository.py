@@ -239,8 +239,11 @@ class RunRepository:
         return {
             "avg_gpu_utilization": round(_mean(by_metric.get("gpu.utilization_percent", [])), 2),
             "max_memory_used_gb": round(max(by_metric.get("gpu.memory_used_gb", [0])), 2),
-            "avg_tokens_per_second": round(_mean(by_metric.get("throughput.tokens_per_second", [])), 2),
+            "avg_process_memory_mb": round(_mean(by_metric.get("process.memory_rss_mb", [])), 2),
+            "avg_cpu_user_seconds": round(_mean(by_metric.get("process.cpu_user_seconds", [])), 4),
+            "avg_tokens_per_second": round(_last(by_metric.get("throughput.tokens_per_second", [])), 2),
             "estimated_cost_usd": round(max(by_metric.get("cost.estimated_usd", [0])), 2),
+            "hardware_note": _hardware_note(by_metric),
         }
 
     def _summarize_run(self, row: dict[str, Any]) -> dict[str, Any]:
@@ -315,3 +318,15 @@ def _health_summary(
 
 def _mean(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
+
+
+def _last(values: list[float]) -> float:
+    return values[-1] if values else 0.0
+
+
+def _hardware_note(by_metric: dict[str, list[float]]) -> str:
+    if by_metric.get("gpu.utilization_percent"):
+        return "GPU metrics were submitted by the training environment."
+    if by_metric.get("process.memory_rss_mb"):
+        return "Local process CPU and memory metrics were submitted; GPU utilization was not available in this run."
+    return "No compute telemetry was submitted for this run."

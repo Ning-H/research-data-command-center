@@ -76,6 +76,7 @@ export default async function RunsPage() {
               <th>Status</th>
               <th>Health</th>
               <th>Checkpoints</th>
+              <th>Data source</th>
               <th>Ingest source</th>
               <th />
             </tr>
@@ -102,6 +103,11 @@ export default async function RunsPage() {
                   <div className="muted-row">{run.health_summary.health_label}</div>
                 </td>
                 <td>{run.checkpoint_count}</td>
+                <td>
+                  <span className={run.source_priority === "GENERATED_REAL" ? "badge" : "badge neutral"}>
+                    {run.source_priority}
+                  </span>
+                </td>
                 <td>{run.ingest_source}</td>
                 <td>
                   <Link className="button secondary" href={`/runs/${run.run_id}`}>

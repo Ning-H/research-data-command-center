@@ -182,8 +182,11 @@ export type RunDetail = RunSummary & {
   compute_summary: {
     avg_gpu_utilization: number;
     max_memory_used_gb: number;
+    avg_process_memory_mb: number;
+    avg_cpu_user_seconds: number;
     avg_tokens_per_second: number;
     estimated_cost_usd: number;
+    hardware_note: string;
   };
   checkpoints: RunCheckpoint[];
   lineage: RunLineageEdge[];

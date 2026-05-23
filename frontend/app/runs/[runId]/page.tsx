@@ -70,7 +70,7 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
           <Metadata label="ingest_source" value={run.ingest_source} />
           <Metadata label="raw_events_uri" value={run.raw_events_uri} />
           <Metadata label="started_at" value={formatDateTime(run.started_at)} />
-          <Metadata label="ended_at" value={formatDateTime(run.ended_at)} />
+          <Metadata label="ended_at" value={run.ended_at ? formatDateTime(run.ended_at) : "not completed"} />
           <Metadata label="source_priority" value={run.source_priority} />
           <Metadata label="model_version_status" value={run.model_version_status} />
         </div>
@@ -107,6 +107,7 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
           <div className="metadata-grid">
             <Metadata label="avg_gpu_utilization" value={`${run.compute_summary.avg_gpu_utilization}%`} />
             <Metadata label="max_memory_used_gb" value={run.compute_summary.max_memory_used_gb} />
+            <Metadata label="avg_process_memory_mb" value={run.compute_summary.avg_process_memory_mb} />
             <Metadata label="avg_tokens_per_second" value={run.compute_summary.avg_tokens_per_second} />
             <Metadata label="estimated_cost_usd" value={`$${run.compute_summary.estimated_cost_usd}`} />
           </div>
@@ -114,6 +115,7 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
             <span className={run.status === "failed" ? "badge warning" : "badge"}>
               {run.health_summary.health_label}
             </span>
+            <p>{run.compute_summary.hardware_note}</p>
             <p>{run.health_summary.signals.join(" · ")}</p>
           </div>
         </div>

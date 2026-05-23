@@ -7,6 +7,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import settings
 from app.runs.ingestion import ingest_run_payload
+from app.runs.lifecycle import (
+    append_run_checkpoints,
+    append_run_events,
+    complete_run,
+    register_run,
+)
 from app.runs.repository import RunRepository
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -14,6 +20,10 @@ router = APIRouter(prefix="/runs", tags=["runs"])
 
 def get_run_repository() -> RunRepository:
     return RunRepository(duckdb_path=Path(settings.duckdb_path), storage_root=Path("."))
+
+
+def get_run_storage_root() -> Path:
+    return Path(settings.raw_storage_root).parent
 
 
 @router.get("")
@@ -26,13 +36,35 @@ def list_runs(
 
 
 @router.post("/ingest")
-def ingest_run(payload: dict[str, Any]) -> dict[str, Any]:
-    result = ingest_run_payload(storage_root=Path(settings.raw_storage_root).parent, payload=payload)
+def ingest_run(
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_run_storage_root)],
+) -> dict[str, Any]:
+    result = ingest_run_payload(storage_root=storage_root, payload=payload)
     return {
         "run_id": result.run_id,
         "run_config_id": result.run_config_id,
         "dataset_version_id": result.dataset_version_id,
         "checkpoint_count": result.checkpoint_count,
+        "raw_events_uri": result.raw_events_uri,
+    }
+
+
+@router.post("/register")
+def register_training_run(
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_run_storage_root)],
+) -> dict[str, Any]:
+    try:
+        result = register_run(storage_root=storage_root, payload=payload)
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "run_id": result.run_id,
+        "run_config_id": result.run_config_id,
+        "dataset_id": result.dataset_id,
+        "dataset_version_id": result.dataset_version_id,
+        "status": result.status,
         "raw_events_uri": result.raw_events_uri,
     }
 
@@ -64,6 +96,27 @@ def list_run_compute(
     return {"items": repository.list_compute_metrics(run_id)}
 
 
+@router.post("/{run_id}/events")
+def append_events(
+    run_id: int,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_run_storage_root)],
+) -> dict[str, Any]:
+    try:
+        result = append_run_events(
+            storage_root=storage_root,
+            run_id=run_id,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "run_id": result.run_id,
+        "appended_count": result.appended_count,
+        "raw_events_uri": result.raw_events_uri,
+    }
+
+
 @router.get("/{run_id}/checkpoints")
 def list_run_checkpoints(
     run_id: int,
@@ -72,9 +125,47 @@ def list_run_checkpoints(
     return {"items": repository.list_checkpoints(run_id)}
 
 
+@router.post("/{run_id}/checkpoints")
+def append_checkpoints(
+    run_id: int,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_run_storage_root)],
+) -> dict[str, Any]:
+    try:
+        result = append_run_checkpoints(
+            storage_root=storage_root,
+            run_id=run_id,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "run_id": result.run_id,
+        "appended_count": result.appended_count,
+        "raw_events_uri": result.raw_events_uri,
+    }
+
+
 @router.get("/{run_id}/lineage")
 def get_run_lineage(
     run_id: int,
     repository: Annotated[RunRepository, Depends(get_run_repository)],
 ) -> dict[str, Any]:
     return {"items": repository.get_lineage(run_id)}
+
+
+@router.post("/{run_id}/complete")
+def complete_training_run(
+    run_id: int,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_run_storage_root)],
+) -> dict[str, Any]:
+    try:
+        result = complete_run(
+            storage_root=storage_root,
+            run_id=run_id,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"run_id": result.run_id, "status": result.status, "ended_at": result.ended_at}

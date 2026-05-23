@@ -75,6 +75,22 @@ POST /runs/{run_id}/checkpoints -> appends checkpoint metadata
 POST /runs/{run_id}/complete -> closes the run as completed, failed, or killed
 ```
 
+The first real local trainer for this project is:
+
+```text
+scripts/train_registered_text_classifier.py
+```
+
+It behaves like a researcher's external training job:
+
+- reads registered dataset records through the API using `dataset_id` and `dataset_version_id`
+- registers a new run through `POST /runs/register`
+- trains a small NumPy softmax text classifier outside the application
+- appends real loss, accuracy, token-throughput, CPU time, memory, and cost metrics
+- writes real local checkpoint artifacts
+- appends checkpoint metadata through `POST /runs/{run_id}/checkpoints`
+- completes the run through `POST /runs/{run_id}/complete`
+
 Same `run_id`:
 
 - same registered run
@@ -114,6 +130,35 @@ dataset_version -> run -> checkpoint -> model_version
 
 ## Demo Data Source Labels
 
-- Run configs and training metrics: `GENERATED_REAL`, produced by a local lightweight demo trainer that emits raw metric events.
-- Compute metrics: realistic demo telemetry derived from the run timeline, bounded by plausible GPU utilization and memory constraints.
+- Runs created by `scripts/train_registered_text_classifier.py`: `GENERATED_REAL`.
+- Temporary rows created by `scripts/seed_demo_runs.py`: `SYNTHETIC_REALISTIC`.
+- MLflow/W&B/TensorBoard imports, when added later, should preserve their original raw event files and map scalars/system metrics into the same long-format metric tables.
 - Dataset inputs: public dataset versions already registered in the dataset catalog.
+
+## Cost Rule
+
+`cost.estimated_usd` is not inferred from model tokens. It comes from the execution
+environment:
+
+```text
+runtime_hours * hourly_compute_rate_usd
+```
+
+For local development on the owner's machine, the default hourly rate is `0.0`,
+because there is no cloud bill. For cloud GPU jobs, the trainer or import adapter
+must submit the instance/GPU hourly rate used for the run.
+
+## Experiment Tracker Integration Rule
+
+W&B, MLflow, and TensorBoard are optional input sources, not the source of truth
+for v1. The platform source of truth is still:
+
+```text
+registered dataset -> registered run_id -> raw events -> normalized metrics/checkpoints
+```
+
+Tracker integrations should work as import/mirroring adapters:
+
+- W&B can provide training metrics and system metrics, including Apple ARM Mac GPU metrics when the W&B SDK is used.
+- MLflow can provide metrics, artifacts, and system metrics; system metrics require `psutil`, and NVIDIA GPU metrics require `nvidia-ml-py`.
+- TensorBoard can provide scalar event logs that can be loaded into tabular form and normalized into `training_metrics`.
