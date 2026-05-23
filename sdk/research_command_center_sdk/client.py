@@ -65,6 +65,17 @@ class ResearchCommandCenterClient:
     ) -> dict[str, Any]:
         return self._patch(f"/experiments/{experiment_id}", payload)
 
+    def append_experiment_note(
+        self,
+        experiment_id: str | int,
+        body: str,
+        author_name: str | None = None,
+    ) -> dict[str, Any]:
+        payload = {"body": body}
+        if author_name:
+            payload["author_name"] = author_name
+        return self._post(f"/experiments/{experiment_id}/notes", payload)
+
     def get_dataset(self, dataset_id: str) -> dict[str, Any]:
         return self._get(f"/datasets/{dataset_id}")
 

@@ -64,6 +64,7 @@ APP_METADATA_TABLES: tuple[TableContract, ...] = (
             "evaluation_plan",
             "tags_json",
             "variants_json",
+            "notes_json",
             "linked_datasets_json",
             "linked_run_ids_json",
             "linked_model_version_ids_json",

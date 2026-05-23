@@ -17,6 +17,7 @@ EXPERIMENT_STATUSES = {"planning", "active", "paused", "completed", "archived"}
 JSON_LIST_FIELDS = {
     "tags",
     "variants",
+    "notes",
     "linked_datasets",
     "linked_run_ids",
     "linked_model_version_ids",
@@ -45,6 +46,14 @@ class RegisteredExperiment:
     experiment_name: str
     status: str
     created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class ExperimentNoteResult:
+    experiment_id: int
+    note_id: int
+    notes: list[dict[str, Any]]
     updated_at: str
 
 
@@ -154,6 +163,52 @@ def update_experiment(
     return updated
 
 
+def append_experiment_note(
+    storage_root: Path,
+    experiment_id: int,
+    payload: dict[str, Any],
+) -> ExperimentNoteResult:
+    path = _experiment_path(storage_root, experiment_id)
+    frame = _read_parquet_if_exists(path)
+    if frame.empty:
+        raise ValueError(f"experiment_id {experiment_id} does not exist")
+    current = frame.iloc[0].to_dict()
+    body = str(payload.get("body") or payload.get("note") or "").strip()
+    if not body:
+        raise ValueError("note body is required")
+
+    notes = _note_list(current)
+    note_id = int(payload.get("note_id") or _next_note_id(notes))
+    note = {
+        "note_id": note_id,
+        "body": body,
+        "author_name": str(
+            payload.get("author_name")
+            or payload.get("created_by_user_id")
+            or current.get("updated_by_user_id")
+            or current.get("owner_name")
+            or "user_demo_owner"
+        ),
+        "created_at": str(payload.get("created_at") or _utc_now()),
+    }
+    notes.append(note)
+    updated = update_experiment(
+        storage_root=storage_root,
+        experiment_id=experiment_id,
+        payload={
+            "notes": notes,
+            "updated_by_user_id": note["author_name"],
+            "updated_at": payload.get("updated_at") or note["created_at"],
+        },
+    )
+    return ExperimentNoteResult(
+        experiment_id=experiment_id,
+        note_id=note_id,
+        notes=json.loads(updated["notes_json"]),
+        updated_at=updated["updated_at"],
+    )
+
+
 def register_experiment_duckdb_view(
     storage_root: Path,
     duckdb_path: Path,
@@ -206,6 +261,7 @@ def _normalize_experiment_row(payload: dict[str, Any]) -> dict[str, Any]:
         "evaluation_plan": str(payload.get("evaluation_plan") or "").strip(),
         "tags_json": json.dumps(_string_list(payload, "tags"), sort_keys=True),
         "variants_json": json.dumps(_variant_list(payload), sort_keys=True),
+        "notes_json": json.dumps(_note_list(payload), sort_keys=True),
         "linked_datasets_json": json.dumps(linked_datasets, sort_keys=True),
         "linked_run_ids_json": json.dumps(
             [int(value) for value in _list_value(payload, "linked_run_ids")],
@@ -241,6 +297,41 @@ def _variant_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return normalized
+
+
+def _note_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    notes = _list_value(payload, "notes")
+    normalized: list[dict[str, Any]] = []
+    for index, note in enumerate(notes, start=1):
+        if isinstance(note, str):
+            body = note.strip()
+            author_name = str(payload.get("updated_by_user_id") or "user_demo_owner")
+            created_at = str(payload.get("updated_at") or _utc_now())
+            note_id = index
+        elif isinstance(note, dict):
+            body = str(note.get("body") or note.get("note") or "").strip()
+            author_name = str(note.get("author_name") or note.get("created_by_user_id") or "")
+            created_at = str(note.get("created_at") or "")
+            note_id = int(note.get("note_id") or index)
+        else:
+            raise ValueError("notes must be strings or objects")
+        if not body:
+            continue
+        normalized.append(
+            {
+                "note_id": note_id,
+                "body": body,
+                "author_name": author_name or "user_demo_owner",
+                "created_at": created_at or _utc_now(),
+            }
+        )
+    return normalized
+
+
+def _next_note_id(notes: list[dict[str, Any]]) -> int:
+    if not notes:
+        return 1
+    return max(int(note["note_id"]) for note in notes) + 1
 
 
 def _linked_dataset_refs(payload: dict[str, Any]) -> list[dict[str, int]]:

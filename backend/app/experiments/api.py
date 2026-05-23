@@ -6,7 +6,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import settings
-from app.experiments.lifecycle import register_experiment, update_experiment
+from app.experiments.lifecycle import append_experiment_note, register_experiment, update_experiment
 from app.experiments.repository import ExperimentRepository
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
@@ -94,3 +94,30 @@ def patch_experiment(
     if experiment is None:
         raise HTTPException(status_code=404, detail=f"Experiment not found: {experiment_id}")
     return experiment
+
+
+@router.post("/{experiment_id}/notes")
+def append_note(
+    experiment_id: int,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_experiment_storage_root)],
+    repository: Annotated[ExperimentRepository, Depends(get_experiment_repository)],
+) -> dict[str, Any]:
+    try:
+        result = append_experiment_note(
+            storage_root=storage_root,
+            experiment_id=experiment_id,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    experiment = repository.get_experiment(experiment_id)
+    if experiment is None:
+        raise HTTPException(status_code=404, detail=f"Experiment not found: {experiment_id}")
+    return {
+        "experiment_id": result.experiment_id,
+        "note_id": result.note_id,
+        "notes": result.notes,
+        "updated_at": result.updated_at,
+        "experiment": experiment,
+    }

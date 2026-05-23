@@ -99,7 +99,7 @@ class ExperimentRepository:
                     "edit_variants",
                     "attach_dataset_versions",
                     "attach_training_runs",
-                    "append_decision_notes",
+                    "append_note",
                 ],
             },
         }
@@ -133,6 +133,7 @@ def _experiment_row(row: dict[str, Any]) -> dict[str, Any]:
         **experiment,
         "tags": _json_list(row.get("tags_json")),
         "variants": _json_list(row.get("variants_json")),
+        "notes": _json_list(row.get("notes_json")),
         "linked_datasets": _json_list(row.get("linked_datasets_json")),
         "linked_run_ids": _json_list(row.get("linked_run_ids_json")),
         "linked_model_version_ids": _json_list(row.get("linked_model_version_ids_json")),
@@ -156,6 +157,7 @@ def _experiment_search_text(experiment: dict[str, Any]) -> str:
         experiment.get("experiment_type"),
         experiment.get("evaluation_plan"),
         experiment.get("decision_notes"),
+        " ".join(str(note.get("body", "")) for note in experiment.get("notes", [])),
         " ".join(str(tag) for tag in experiment.get("tags", [])),
     ]
     return " ".join(str(value or "").lower() for value in values)
