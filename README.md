@@ -50,7 +50,7 @@ API and SDK references live under Docs. Dataset lineage belongs inside Datasets,
 ## Local Validation
 
 ```bash
-uv run --python 3.11 --with pytest python -m pytest
+uv run --python 3.13 --with pytest python -m pytest
 ```
 
 ## Dataset Walking Skeleton
@@ -58,7 +58,7 @@ uv run --python 3.11 --with pytest python -m pytest
 After Dataset Checkpoint 2 approval, the first ingestion path normalizes Databricks Dolly 15k into local Parquet and registers DuckDB views:
 
 ```bash
-uv run --python 3.11 python scripts/ingest_dolly.py --limit 100
+uv run --python 3.13 python scripts/ingest_dolly.py --limit 100
 ```
 
 Generated raw, object-store, Parquet, and DuckDB files are written under `storage/` and intentionally ignored by git.
