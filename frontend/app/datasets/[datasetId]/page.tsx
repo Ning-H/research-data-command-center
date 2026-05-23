@@ -61,15 +61,17 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           <p className="subtle">Human-readable source first; stable IDs remain available for lineage, APIs, and joins.</p>
         </div>
         <div className="metadata-grid">
+          <Metadata label="dataset_id" value={dataset.dataset_display_id} />
+          <Metadata label="dataset_version_id" value={dataset.dataset_version_display_id} />
           <Metadata label="dataset_name" value={dataset.name} />
-          <Metadata label="public_source" value={dataset.source_dataset_name} />
+          <Metadata label="source_link" value={dataset.source_dataset_name} href={dataset.source_url} />
           <Metadata label="record_count" value={dataset.record_count.toLocaleString()} />
-          <Metadata label="dataset_id" value={dataset.dataset_id} />
-          <Metadata label="dataset_version_id" value={dataset.dataset_version_id} />
           <Metadata label="source_label" value={dataset.source_label} />
           <Metadata label="task_type" value={dataset.task_type} />
           <Metadata label="mean_tokens" value={formatMetric(metrics["tokens.mean"])} />
           <Metadata label="quality_status" value={dataset.quality_status} />
+          <Metadata label="url_slug" value={dataset.route_dataset_id} />
+          <Metadata label="version_storage_key" value={dataset.dataset_version_id} />
         </div>
       </div>
 
@@ -81,12 +83,14 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           </div>
           <div className="record-list">
             {dataset.sample_records.slice(0, 5).map((record) => (
-              <article className="record" key={record.record_id}>
+              <article className="record" key={record.record_storage_key}>
                 <div className="muted-row">
-                  {record.category} · row {record.source_row_id}
+                  {record.category} · record_id {record.record_display_id}
                 </div>
                 <h3>{record.instruction}</h3>
-                <Metadata label="record_id" value={record.record_id} />
+                <Metadata label="record_id" value={record.record_display_id} />
+                <Metadata label="source_row_id" value={record.source_row_id} />
+                <Metadata label="record_storage_key" value={record.record_storage_key} />
                 {record.question ? <RecordBlock label="Question" value={record.question} /> : null}
                 {record.input_text ? <RecordBlock label="Input" value={record.input_text} /> : null}
                 {record.chosen_text ? <RecordBlock label="Chosen" value={record.chosen_text} /> : null}
@@ -162,9 +166,10 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
             <div className="record" key={`${edge.lineage_event_type}-${edge.target_dataset_version_id}`}>
               <span className="badge">{edge.lineage_event_type}</span>
               <h3>{edge.transform_name}</h3>
-              <Metadata label="dataset_id" value={edge.dataset_id} />
-              <Metadata label="source_dataset_version_id" value={edge.source_dataset_version_id || "public source"} />
-              <Metadata label="target_dataset_version_id" value={edge.target_dataset_version_id} />
+              <Metadata label="dataset_id" value={edge.dataset_display_id} />
+              <Metadata label="source_dataset_version_id" value={edge.source_dataset_version_display_id || edge.source_label} />
+              <Metadata label="target_dataset_version_id" value={edge.target_dataset_version_display_id} />
+              <Metadata label="version_storage_key" value={edge.target_dataset_version_id} />
               <Metadata label="created_by_user_id" value={edge.created_by_user_id} />
             </div>
           ))}
@@ -174,11 +179,17 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
   );
 }
 
-function Metadata({ label, value }: { label: string; value: string | number }) {
+function Metadata({ label, value, href }: { label: string; value: string | number; href?: string }) {
   return (
     <div className="metadata-item">
       <span>{label}</span>
-      <strong>{value}</strong>
+      {href ? (
+        <a href={href} rel="noreferrer" target="_blank">
+          {value}
+        </a>
+      ) : (
+        <strong>{value}</strong>
+      )}
     </div>
   );
 }

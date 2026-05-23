@@ -297,11 +297,18 @@ tr:last-child td {
   font-weight: 700;
 }
 
-.metadata-item strong {
+.metadata-item strong,
+.metadata-item a {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   font-weight: 650;
   overflow-wrap: anywhere;
+}
+
+.metadata-item a {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .placeholder-grid {

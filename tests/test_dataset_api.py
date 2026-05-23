@@ -43,6 +43,8 @@ def test_dataset_catalog_and_detail_api(tmp_path: Path) -> None:
         assert {"input_text", "target_text", "question", "chosen_text", "rejected_text"}.issubset(
             detail["sample_records"][0]
         )
+        assert detail["sample_records"][0]["record_display_id"] == 1
+        assert "record_storage_key" in detail["sample_records"][0]
         assert {metric["metric_name"] for metric in detail["quality_metrics"]} >= {
             "records.total",
             "tokens.mean",

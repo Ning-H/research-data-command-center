@@ -2,9 +2,13 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8
 
 export type DatasetSummary = {
   dataset_id: string;
+  dataset_display_id: number;
   dataset_version_id: string;
+  dataset_version_display_id: number;
+  route_dataset_id: string;
   name: string;
   source_dataset_name: string;
+  source_url: string;
   task_type: string;
   category: string;
   source_label: string;
@@ -33,7 +37,8 @@ export type SchemaField = {
 };
 
 export type DatasetRecord = {
-  record_id: string;
+  record_display_id: number;
+  record_storage_key: string;
   source_split: string;
   source_row_id: string;
   category: string;
@@ -51,8 +56,12 @@ export type DatasetRecord = {
 
 export type DatasetLineage = {
   dataset_id: string;
+  dataset_display_id: number;
   source_dataset_version_id: string;
+  source_dataset_version_display_id: string;
   target_dataset_version_id: string;
+  target_dataset_version_display_id: number;
+  source_label: string;
   lineage_event_type: string;
   transform_name: string;
   transform_config_uri: string;

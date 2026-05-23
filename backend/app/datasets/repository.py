@@ -74,6 +74,10 @@ class DatasetRepository:
             {
                 **row,
                 "name": _display_name(row["source_dataset_name"]),
+                "dataset_display_id": _dataset_display_id(row["source_dataset_name"]),
+                "dataset_version_display_id": 1,
+                "route_dataset_id": row["dataset_id"],
+                "source_url": _source_url(row["source_dataset_name"]),
                 "quality_status": _quality_status(row["gate_status_numeric"]),
                 "category": _category_for_task(row["task_type"]),
             }
@@ -114,7 +118,8 @@ class DatasetRepository:
         return self._query(
             f"""
             SELECT
-                record_id,
+                ROW_NUMBER() OVER (ORDER BY TRY_CAST(source_row_id AS INTEGER), source_row_id) + ? AS record_display_id,
+                record_id AS record_storage_key,
                 source_split,
                 source_row_id,
                 category,
@@ -133,7 +138,7 @@ class DatasetRepository:
             ORDER BY TRY_CAST(source_row_id AS INTEGER), source_row_id
             LIMIT ? OFFSET ?
             """,
-            params,
+            [offset, *params],
         )
 
     def get_quality_metrics(self, dataset_id: str, dataset_version_id: str) -> list[dict[str, Any]]:
@@ -177,7 +182,7 @@ class DatasetRepository:
         return self._query(query, params)
 
     def get_lineage(self, dataset_id: str, dataset_version_id: str) -> list[dict[str, Any]]:
-        return self._query(
+        rows = self._query(
             """
             SELECT
                 dataset_id,
@@ -194,6 +199,16 @@ class DatasetRepository:
             """,
             [dataset_id, dataset_version_id],
         )
+        return [
+            {
+                **row,
+                "dataset_display_id": _dataset_display_id_for_dataset_id(row["dataset_id"]),
+                "source_dataset_version_display_id": "",
+                "target_dataset_version_display_id": 1,
+                "source_label": "public source",
+            }
+            for row in rows
+        ]
 
     def _query(self, query: str, params: list[Any] | None = None) -> list[dict[str, Any]]:
         connection = duckdb.connect(str(self.duckdb_path), read_only=True)
@@ -213,6 +228,30 @@ def _display_name(source_dataset_name: str) -> str:
         "allenai/squad": "SQuAD Question Answering",
         "openai/openai_humaneval": "OpenAI HumanEval",
     }.get(source_dataset_name, source_dataset_name)
+
+
+def _dataset_display_id(source_dataset_name: str) -> int:
+    return {
+        "databricks/databricks-dolly-15k": 1,
+        "Anthropic/hh-rlhf": 2,
+        "knkarthick/samsum": 3,
+        "allenai/squad": 4,
+        "openai/openai_humaneval": 5,
+    }.get(source_dataset_name, 0)
+
+
+def _dataset_display_id_for_dataset_id(dataset_id: str) -> int:
+    return {
+        "ds_databricks_dolly_15k": 1,
+        "ds_anthropic_hh_rlhf": 2,
+        "ds_samsum": 3,
+        "ds_squad": 4,
+        "ds_openai_humaneval": 5,
+    }.get(dataset_id, 0)
+
+
+def _source_url(source_dataset_name: str) -> str:
+    return f"https://huggingface.co/datasets/{source_dataset_name}"
 
 
 def _category_for_task(task_type: str) -> str:
