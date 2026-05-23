@@ -38,34 +38,37 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
 
       <div className="summary-grid">
         <div className="metric">
-          <p className="metric-label">Dataset ID</p>
-          <p className="metric-value compact">{dataset.dataset_id}</p>
+          <p className="metric-label">Dataset</p>
+          <p className="metric-value compact">{dataset.name}</p>
         </div>
         <div className="metric">
           <p className="metric-label">Records</p>
           <p className="metric-value">{dataset.record_count.toLocaleString()}</p>
         </div>
         <div className="metric">
-          <p className="metric-label">Mean tokens</p>
-          <p className="metric-value">{formatMetric(metrics["tokens.mean"])}</p>
+          <p className="metric-label">Task</p>
+          <p className="metric-value compact">{dataset.category}</p>
         </div>
         <div className="metric">
-          <p className="metric-label">Source</p>
-          <p className="metric-value compact">{dataset.source_dataset_name}</p>
+          <p className="metric-label">Quality</p>
+          <p className="metric-value">{dataset.quality_status}</p>
         </div>
       </div>
 
       <div className="panel">
         <div>
-          <h2>Identity & Source</h2>
-          <p className="subtle">Stable IDs and provenance used by downstream runs, models, and evaluations.</p>
+          <h2>Source & Version</h2>
+          <p className="subtle">Human-readable source first; stable IDs remain available for lineage, APIs, and joins.</p>
         </div>
         <div className="metadata-grid">
+          <Metadata label="dataset_name" value={dataset.name} />
+          <Metadata label="public_source" value={dataset.source_dataset_name} />
+          <Metadata label="record_count" value={dataset.record_count.toLocaleString()} />
           <Metadata label="dataset_id" value={dataset.dataset_id} />
           <Metadata label="dataset_version_id" value={dataset.dataset_version_id} />
-          <Metadata label="source_dataset_name" value={dataset.source_dataset_name} />
           <Metadata label="source_label" value={dataset.source_label} />
           <Metadata label="task_type" value={dataset.task_type} />
+          <Metadata label="mean_tokens" value={formatMetric(metrics["tokens.mean"])} />
           <Metadata label="quality_status" value={dataset.quality_status} />
         </div>
       </div>
