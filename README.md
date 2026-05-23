@@ -14,6 +14,26 @@ The product question is:
 
 The repo now has working foundation slices for data assets, training run ingestion, checkpoint search, and checkpoint-to-model registration. The next expansion should attach evaluations, inference traces, failure cases, and dataset candidates to the same lineage spine.
 
+## First Research Program
+
+The seed program is based on a real user experience: asking a frontier model to
+generate Python algorithms study material should be a standard educational task,
+but the final document came back shallow, uneven, and hard to use. It produced a
+lot of fluent text, but did not create a systematic learning artifact with clear
+coverage, deep explanations, examples, LeetCode-style practice links, and a
+progression from fundamentals to harder patterns.
+
+That motivates the first research program:
+
+> Improve structured technical study-material generation for Python algorithms
+> interview preparation.
+
+This is a useful research-data-platform demo because it touches the whole
+lifecycle: collect public educational/coding data, define study-guide quality
+rubrics, run model variants, compare generated documents, capture failures such
+as missing topics or shallow explanations, and turn those failures into the next
+dataset version.
+
 ## Product Navigation
 
 ```text
@@ -99,4 +119,6 @@ Generated raw, object-store, Parquet, and DuckDB files are written under `storag
 
 ## Next Build Slice
 
-Build evaluations against `model_version_id`, then save failed eval outputs into the Failure Library and dataset candidate workflow.
+Build the study-material evaluation slice against `model_version_id`, then save
+failed generated sections into the Failure Library and dataset candidate
+workflow.

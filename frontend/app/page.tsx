@@ -107,13 +107,17 @@ export default async function HomePage() {
           <div>
             <h2>Immediate Lifecycle Story</h2>
             <p className="subtle">
-              Improve tool-use reliability by comparing an SFT baseline against an SFT mixture with
-              tool-use traces, then convert unsafe failures into the next dataset iteration.
+              Improve structured Python algorithms study-guide generation by comparing a baseline
+              model against variants trained with better outlines, examples, and corrected failures.
             </p>
           </div>
           <div className="record-list">
-            <LifecycleStep step="1" title="Research Program" value="Improve tool-use reliability" />
-            <LifecycleStep step="2" title="Hypothesis" value="Adding high-quality tool-use traces improves task success." />
+            <LifecycleStep step="1" title="Research Program" value="Improve structured study-material generation" />
+            <LifecycleStep
+              step="2"
+              title="Hypothesis"
+              value="Structured examples, outline-first patterns, and corrected failures improve coverage and depth."
+            />
             <LifecycleStep step="3" title="Current Working Spine" value="data asset -> training run -> checkpoint -> model version" />
             <LifecycleStep step="4" title="Next Build Slice" value="evaluation run -> failure case -> dataset candidate" />
           </div>

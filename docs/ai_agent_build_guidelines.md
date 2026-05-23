@@ -23,6 +23,11 @@ Research Program -> Hypothesis -> Data Assets -> Data Mixtures -> Experiments
 
 The product should feel like an internal research data platform for technical researchers, ML platform engineers, and data platform teams. It should not feel like a generic dashboard.
 
+The first seeded research program is documented in
+`docs/study_material_research_program.md`: improving structured technical
+study-material generation for Python algorithms interview preparation. Use this
+program as the concrete demo story until the owner approves a replacement.
+
 ## Final Navigation
 
 ```text

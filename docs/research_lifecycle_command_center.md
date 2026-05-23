@@ -112,34 +112,39 @@ relationship = used_by
 
 ```text
 1. Research Program:
-   Improve tool-use reliability.
+   Improve structured technical study-material generation.
 
 2. Hypothesis:
-   Adding high-quality tool-use traces improves task success.
+   Adding structured study-guide examples, outline-first generation patterns,
+   and corrected failures improves the usefulness of Python algorithms study
+   guides.
 
 3. Data Assets:
-   SFT data + tool-use traces + safety examples.
+   Public coding/education data + generated study-guide outputs + rubric labels.
 
 4. Data Mixture:
-   70% instruction data, 20% tool-use traces, 10% safety data.
+   Instruction data, coding explanations, outline examples, and failure-derived
+   corrections.
 
 5. Training Run:
-   SFT run using that mixture.
+   Externally executed SFT run using the study-guide data mixture.
 
 6. Model Version:
-   model-v0.2 generated from checkpoint-003.
+   Candidate model version generated from the best checkpoint.
 
 7. Evaluation:
-   Tool-use success improves, but safety refusal regression appears.
+   Coverage and depth improve, but some sections still miss examples or contain
+   weak complexity analysis.
 
 8. Failure Library:
-   Unsafe tool-use failures are captured.
+   Shallow explanations, missing algorithm categories, and weak examples are
+   captured.
 
 9. Dataset Candidate:
-   Convert failures into new safety/tool-use training examples.
+   Convert failed sections into corrected study-guide examples.
 
 10. Next Experiment:
-   Run v0.3 with improved safety mixture.
+   Run the next variant with failure-replay data and stricter rubric checks.
 ```
 
 ## Build Phases

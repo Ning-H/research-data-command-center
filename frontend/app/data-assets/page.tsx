@@ -60,13 +60,13 @@ export default async function DataAssetsPage() {
         </div>
         <div className="component-grid">
           <AssetType icon={<Database aria-hidden="true" size={18} />} title="Post-training data">
-            Instruction SFT, preference data, safety refusal, coding, summarization, and QA.
+            Instruction SFT, coding explanations, algorithm references, study-guide examples, and QA.
           </AssetType>
           <AssetType icon={<ShieldCheck aria-hidden="true" size={18} />} title="Eval and safety data">
             Eval datasets, red-team data, over-refusal examples, and benchmark tasks.
           </AssetType>
           <AssetType icon={<Layers aria-hidden="true" size={18} />} title="Data mixtures">
-            Planned mixtures like 70 percent instruction, 20 percent tool traces, 10 percent safety.
+            Planned mixtures like instruction data, coding explanations, outlines, and failure-derived corrections.
           </AssetType>
         </div>
       </div>

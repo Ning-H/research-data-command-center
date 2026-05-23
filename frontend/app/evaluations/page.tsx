@@ -12,7 +12,7 @@ export default function EvaluationsPage() {
       cards={[
         {
           title: "Eval suites",
-          body: "Capability, coding, math, tool-use, long-context, safety, hallucination, and regression evals.",
+          body: "Coverage, depth, example quality, learning progression, coding accuracy, safety, and regression evals.",
         },
         {
           title: "Model comparison",

@@ -6,11 +6,11 @@ export default function FailureLibraryPage() {
       eyebrow="Failure Library"
       title="Failure Library"
       description="Centralize model failures from evals and inference traces, then route them into dataset iteration."
-      status="This is where hallucinations, unsafe outputs, over-refusals, tool-use failures, retrieval failures, and formatting issues become actionable research data."
+      status="This is where shallow explanations, missing topics, inaccurate code, hallucinations, unsafe outputs, and formatting issues become actionable research data."
       cards={[
         {
           title: "Failure types",
-          body: "Hallucination, bad reasoning, bad code, unsafe output, over-refusal, tool-use failure, retrieval failure, long-context failure, and latency failure.",
+          body: "Missing algorithm category, shallow explanation, no code pattern, no practice example, bad complexity analysis, hallucination, and format failure.",
         },
         {
           title: "Severity workflow",

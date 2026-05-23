@@ -10,8 +10,8 @@ export default function ExperimentsPage() {
       cards={[
         {
           label: "seed example",
-          title: "SFT baseline vs SFT + tool traces",
-          body: "Compare a baseline instruction mixture against a 20 percent tool-use trace mixture.",
+          title: "Baseline vs structured study guides",
+          body: "Compare a general instruction baseline against variants with outlines, examples, and failure-replay corrections.",
         },
         {
           title: "Expected metric movement",

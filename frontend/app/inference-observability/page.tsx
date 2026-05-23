@@ -5,16 +5,16 @@ export default function InferenceObservabilityPage() {
     <LifecyclePage
       eyebrow="Inference Observability"
       title="Inference Observability"
-      description="Track real or simulated model usage after deployment, including latency, token usage, tool calls, retrieval context, and safety filters."
+      description="Track real or scripted model generations after deployment, including prompts, responses, latency, token usage, retrieval context, and safety filters."
       status="This page makes the project feel closer to production AI behavior while still keeping the platform focused on research data."
       cards={[
         {
           title: "Inference traces",
-          body: "Prompt, response, token counts, latency, model_version_id, and deployment context.",
+          body: "Prompt, generated study guide, token counts, latency, model_version_id, and deployment context.",
         },
         {
-          title: "Tool calls",
-          body: "Track tool names, arguments, latency, errors, and whether the call helped the answer.",
+          title: "Document traces",
+          body: "Track requested topic list, outline shape, generated sections, source context, and reviewer feedback.",
         },
         {
           title: "Safety results",
