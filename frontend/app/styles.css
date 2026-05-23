@@ -429,6 +429,24 @@ tr:last-child td {
   line-height: 1.45;
 }
 
+.sparkline {
+  align-items: flex-end;
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  gap: 4px;
+  height: 130px;
+  padding: 14px;
+}
+
+.sparkline span {
+  background: var(--accent);
+  border-radius: 4px 4px 0 0;
+  flex: 1;
+  min-width: 6px;
+}
+
 .compact-table table {
   min-width: 0;
 }

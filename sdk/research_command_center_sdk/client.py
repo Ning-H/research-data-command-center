@@ -35,6 +35,24 @@ class ResearchCommandCenterClient:
     def trace_dataset_lineage(self, dataset_id: str, version_id: str) -> dict[str, Any]:
         return self._get(f"/datasets/{dataset_id}/versions/{version_id}/lineage")
 
+    def list_runs(self) -> dict[str, Any]:
+        return self._get("/runs")
+
+    def get_run(self, run_id: str | int) -> dict[str, Any]:
+        return self._get(f"/runs/{run_id}")
+
+    def get_run_metrics(self, run_id: str | int) -> dict[str, Any]:
+        return self._get(f"/runs/{run_id}/metrics")
+
+    def get_run_compute(self, run_id: str | int) -> dict[str, Any]:
+        return self._get(f"/runs/{run_id}/compute")
+
+    def get_run_checkpoints(self, run_id: str | int) -> dict[str, Any]:
+        return self._get(f"/runs/{run_id}/checkpoints")
+
+    def trace_run_lineage(self, run_id: str | int) -> dict[str, Any]:
+        return self._get(f"/runs/{run_id}/lineage")
+
     def _get(self, path: str) -> dict[str, Any]:
         with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
             response = client.get(path)
