@@ -67,6 +67,10 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
           <Metadata label="dataset_version_id" value={run.dataset_version_id} />
           <Metadata label="model_family" value={run.model_family} />
           <Metadata label="training_environment" value={run.training_environment} />
+          <Metadata label="framework" value={String(run.run_config.config.framework ?? "not provided")} />
+          <Metadata label="tracker" value={String(run.run_config.config.tracker ?? "not provided")} />
+          <Metadata label="device" value={String(run.run_config.config.device ?? "not provided")} />
+          <Metadata label="trainer" value={String(run.run_config.config.trainer ?? "not provided")} />
           <Metadata label="ingest_source" value={run.ingest_source} />
           <Metadata label="raw_events_uri" value={run.raw_events_uri} />
           <Metadata label="started_at" value={formatDateTime(run.started_at)} />

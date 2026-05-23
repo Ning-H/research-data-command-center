@@ -75,21 +75,38 @@ POST /runs/{run_id}/checkpoints -> appends checkpoint metadata
 POST /runs/{run_id}/complete -> closes the run as completed, failed, or killed
 ```
 
-The first real local trainer for this project is:
+The preferred real local trainer for this project is:
 
 ```text
-scripts/train_registered_text_classifier.py
+scripts/train_registered_torch_classifier.py
 ```
 
 It behaves like a researcher's external training job:
 
 - reads registered dataset records through the API using `dataset_id` and `dataset_version_id`
 - registers a new run through `POST /runs/register`
-- trains a small NumPy softmax text classifier outside the application
+- trains a small PyTorch text classifier outside the application
+- writes TensorBoard scalar logs for loss, accuracy, throughput, memory, and cost
 - appends real loss, accuracy, token-throughput, CPU time, memory, and cost metrics
-- writes real local checkpoint artifacts
+- writes real local `.pt` checkpoint artifacts
 - appends checkpoint metadata through `POST /runs/{run_id}/checkpoints`
 - completes the run through `POST /runs/{run_id}/complete`
+
+Local PyTorch setup note:
+
+```text
+arch -arm64 /Library/Frameworks/Python.framework/Versions/3.13/bin/python3.13 -m venv .venv-arm64-torch
+arch -arm64 .venv-arm64-torch/bin/python -m pip install -e . torch tensorboard
+arch -arm64 .venv-arm64-torch/bin/python scripts/train_registered_torch_classifier.py
+```
+
+The separate arm64 environment is needed on the owner's current machine because
+the installed `uv` binary is x86_64 while PyTorch's Python 3.13 macOS wheel is
+available for arm64.
+
+The older `scripts/train_registered_text_classifier.py` NumPy trainer remains as
+a lightweight fallback, but PyTorch + TensorBoard is the portfolio-facing
+training path.
 
 Same `run_id`:
 
@@ -130,7 +147,8 @@ dataset_version -> run -> checkpoint -> model_version
 
 ## Demo Data Source Labels
 
-- Runs created by `scripts/train_registered_text_classifier.py`: `GENERATED_REAL`.
+- Runs created by `scripts/train_registered_torch_classifier.py`: `GENERATED_REAL`.
+- Runs created by `scripts/train_registered_text_classifier.py`: `GENERATED_REAL`, lightweight fallback.
 - Temporary rows created by `scripts/seed_demo_runs.py`: `SYNTHETIC_REALISTIC`.
 - MLflow/W&B/TensorBoard imports, when added later, should preserve their original raw event files and map scalars/system metrics into the same long-format metric tables.
 - Dataset inputs: public dataset versions already registered in the dataset catalog.
