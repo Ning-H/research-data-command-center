@@ -7,6 +7,7 @@ from app.datasets.public_ingestions import (
     HH_RLHF,
     SAMSUM,
     SQUAD,
+    fetch_hugging_face_rows_batched,
     ingest_humaneval_records,
     ingest_hh_rlhf_records,
     ingest_samsum_records,
@@ -103,6 +104,26 @@ def test_humaneval_normalization_maps_coding_task() -> None:
     assert record["source_row_id"] == "HumanEval/0"
 
 
+def test_batched_fetch_respects_requested_limit(monkeypatch) -> None:
+    calls = []
+
+    def fake_fetch(**kwargs):
+        calls.append(kwargs)
+        return [{"row": index} for index in range(kwargs["limit"])]
+
+    monkeypatch.setattr("app.datasets.public_ingestions.fetch_hugging_face_rows", fake_fetch)
+
+    rows = fetch_hugging_face_rows_batched(
+        dataset_name="example/source",
+        limit=250,
+        batch_size=100,
+    )
+
+    assert len(rows) == 250
+    assert [call["limit"] for call in calls] == [100, 100, 50]
+    assert [call["offset"] for call in calls] == [0, 100, 200]
+
+
 def test_public_ingestions_share_duckdb_catalog(tmp_path: Path) -> None:
     ingest_hh_rlhf_records(
         storage_root=tmp_path,
@@ -162,3 +183,4 @@ def test_public_ingestions_share_duckdb_catalog(tmp_path: Path) -> None:
         ("ds_samsum", "summarization", 1),
         ("ds_squad", "question_answering", 1),
     ]
+    fetch_hugging_face_rows_batched,

@@ -102,6 +102,36 @@ def fetch_hugging_face_rows(
     return [row["row"] for row in payload.get("rows", [])]
 
 
+def fetch_hugging_face_rows_batched(
+    dataset_name: str,
+    split: str = "train",
+    config: str = "default",
+    limit: int = 100,
+    offset: int = 0,
+    batch_size: int = 100,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    remaining = limit
+    current_offset = offset
+    while remaining > 0:
+        page_size = min(batch_size, remaining)
+        page = fetch_hugging_face_rows(
+            dataset_name=dataset_name,
+            split=split,
+            config=config,
+            limit=page_size,
+            offset=current_offset,
+        )
+        if not page:
+            break
+        rows.extend(page)
+        if len(page) < page_size:
+            break
+        current_offset += len(page)
+        remaining -= len(page)
+    return rows
+
+
 def normalize_hh_rlhf_record(
     source_row: dict[str, Any],
     source_row_id: int,
@@ -274,7 +304,7 @@ def ingest_from_hugging_face(
 ) -> IngestionResult:
     definition, normalizer = NORMALIZERS[dataset_key]
     resolved_split = split or DEFAULT_SPLITS.get(dataset_key, "train")
-    source_records = fetch_hugging_face_rows(
+    source_records = fetch_hugging_face_rows_batched(
         dataset_name=definition.source_dataset_name,
         config=DEFAULT_CONFIGS.get(dataset_key, "default"),
         split=resolved_split,
