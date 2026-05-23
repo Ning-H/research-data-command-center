@@ -36,7 +36,6 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
                 "current_focus": "Build the first rubric-backed evaluation slice.",
                 "owner_name": "minion1",
                 "researcher_names": ["minion1", "minion2"],
-                "success_metrics": ["coverage_score", "depth_score", "example_quality_score"],
                 "tags": ["study_material", "python_algorithms", "long_form_generation"],
                 "linked_dataset_ids": [1],
                 "linked_dataset_versions": [{"dataset_id": 1, "dataset_version_id": 1}],
@@ -67,6 +66,8 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
         assert detail["linked_run_ids"] == [7]
         assert detail["ui_workflow"]["can_update_from_ui"] is True
         assert "attach_training_runs" in detail["ui_workflow"]["supported_actions"]
+        assert "success_metrics" not in detail
+        assert all(not key.endswith("_json") for key in detail)
 
         tag_response = client.get("/research-programs", params={"tag": "python_algorithms"})
         assert tag_response.status_code == 200

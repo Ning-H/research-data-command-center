@@ -109,10 +109,10 @@ class ResearchProgramRepository:
 
 
 def _program_row(row: dict[str, Any]) -> dict[str, Any]:
+    program = {key: value for key, value in row.items() if not key.endswith("_json")}
     return {
-        **row,
+        **program,
         "researcher_names": _json_list(row.get("researcher_names_json")),
-        "success_metrics": _json_list(row.get("success_metrics_json")),
         "tags": _json_list(row.get("tags_json")),
         "linked_dataset_ids": _json_list(row.get("linked_dataset_ids_json")),
         "linked_dataset_versions": _json_list(row.get("linked_dataset_versions_json")),

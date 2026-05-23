@@ -14,7 +14,6 @@ PROGRAM_STATUSES = {"planning", "active", "paused", "completed", "archived"}
 
 JSON_LIST_FIELDS = {
     "researcher_names",
-    "success_metrics",
     "tags",
     "linked_dataset_ids",
     "linked_dataset_versions",
@@ -173,7 +172,6 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
     if not program_name:
         raise ValueError("program_name is required")
     researcher_names = _string_list(payload, "researcher_names")
-    success_metrics = _string_list(payload, "success_metrics")
     tags = _string_list(payload, "tags")
     linked_dataset_ids = [int(value) for value in _list_value(payload, "linked_dataset_ids")]
     linked_dataset_versions = _dataset_version_refs(payload)
@@ -194,7 +192,6 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
         "current_focus": str(payload.get("current_focus") or "").strip(),
         "owner_name": str(payload.get("owner_name") or "").strip(),
         "researcher_names_json": json.dumps(researcher_names, sort_keys=True),
-        "success_metrics_json": json.dumps(success_metrics, sort_keys=True),
         "tags_json": json.dumps(tags, sort_keys=True),
         "linked_dataset_ids_json": json.dumps(linked_dataset_ids, sort_keys=True),
         "linked_dataset_versions_json": json.dumps(linked_dataset_versions, sort_keys=True),

@@ -35,7 +35,6 @@ APP_METADATA_TABLES: tuple[TableContract, ...] = (
             "current_focus",
             "owner_name",
             "researcher_names_json",
-            "success_metrics_json",
             "tags_json",
             "linked_dataset_ids_json",
             "linked_dataset_versions_json",
