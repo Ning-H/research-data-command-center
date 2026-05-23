@@ -7,10 +7,16 @@ export type DatasetSummary = {
   source_dataset_name: string;
   source_url: string;
   task_type: string;
+  data_purpose: string;
+  data_format: string;
+  query_engine: string;
+  description: string;
   category: string;
   source_label: string;
   record_count: number;
   quality_status: string;
+  registration_date: string;
+  last_updated_date: string;
   created_at: string;
 };
 
@@ -62,8 +68,28 @@ export type DatasetLineage = {
   created_by_user_id: string;
 };
 
-export type DatasetDetail = DatasetSummary & {
+export type QualityCheck = {
+  name: string;
+  status: string;
+  metric_name: string;
+  metric_value: number;
   description: string;
+};
+
+export type QualitySummary = {
+  status: string;
+  framework: string;
+  meaning: string;
+  procedure: string[];
+  required_fields: string[];
+  null_value_policy: string;
+  total_null_values: number;
+  fields_with_nulls: number;
+  checks: QualityCheck[];
+};
+
+export type DatasetDetail = DatasetSummary & {
+  quality_summary: QualitySummary;
   quality_metrics: QualityMetric[];
   schema_profile: SchemaField[];
   lineage: DatasetLineage[];

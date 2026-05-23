@@ -189,7 +189,10 @@ tokens.mean
 tokens.p95
 pii.fake_test_match_count
 quality.gate_status_numeric
+schema.null_values.total
 ```
+
+`schema.null_values.total` is derived from `dataset_schema_profiles` for API/UI quality summaries. Nulls are purpose-aware: required-field nulls can fail the gate, while fields that do not apply to a dataset purpose are measured but allowed.
 
 ### `dataset_duplicate_reports`
 

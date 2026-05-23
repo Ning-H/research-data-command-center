@@ -39,6 +39,11 @@ def test_dataset_catalog_and_detail_api(tmp_path: Path) -> None:
         detail = detail_response.json()
         assert detail["dataset_version_id"] == 1
         assert detail["dataset_id"] == 1
+        assert detail["registration_date"] == detail["last_updated_date"]
+        assert detail["data_purpose"] == "Training data for instruction tuning"
+        assert detail["data_format"] == "Parquet"
+        assert detail["query_engine"] == "DuckDB"
+        assert "Human-written instruction-following data" in detail["description"]
         assert len(detail["sample_records"]) == 5
         assert {"input_text", "target_text", "question", "chosen_text", "rejected_text"}.issubset(
             detail["sample_records"][0]
@@ -49,6 +54,10 @@ def test_dataset_catalog_and_detail_api(tmp_path: Path) -> None:
             "records.total",
             "tokens.mean",
         }
+        assert detail["quality_summary"]["status"] == "passed"
+        assert "input_text" in detail["quality_summary"]["required_fields"]
+        assert "Nulls are counted" in detail["quality_summary"]["null_value_policy"]
+        assert detail["quality_summary"]["checks"][0]["metric_name"] == "records.empty_required_field_count"
 
         records_response = client.get("/datasets/1/versions/1/records?limit=2")
         assert records_response.status_code == 200

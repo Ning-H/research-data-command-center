@@ -220,6 +220,12 @@ tr:last-child td {
   color: var(--warning);
 }
 
+.badge.neutral {
+  background: #f2f5f8;
+  border-color: var(--border);
+  color: #526173;
+}
+
 .button {
   align-items: center;
   background: var(--accent);
@@ -309,6 +315,43 @@ tr:last-child td {
   color: var(--accent-strong);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.description-box,
+.quality-note,
+.quality-check {
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.description-box span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.description-box p,
+.quality-note p,
+.quality-check p {
+  color: #2c3847;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.quality-checks {
+  display: grid;
+  gap: 10px;
+}
+
+.quality-check > div:first-child {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
 }
 
 .placeholder-grid {

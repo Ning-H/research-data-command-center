@@ -36,6 +36,11 @@ Every dataset detail page should expose:
 - Dataset name.
 - Human-facing `dataset_id`.
 - Human-facing `dataset_version_id`.
+- Registration date.
+- Last updated date.
+- Dataset description.
+- Data purpose.
+- Data format.
 - Public source link.
 - Source label: `PUBLIC_REAL`, `GENERATED_REAL`, or `SYNTHETIC_REALISTIC`.
 - Numeric `record_id` values for sample records.

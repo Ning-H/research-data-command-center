@@ -46,8 +46,8 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           <p className="metric-value">{dataset.record_count.toLocaleString()}</p>
         </div>
         <div className="metric">
-          <p className="metric-label">Task</p>
-          <p className="metric-value compact">{dataset.category}</p>
+          <p className="metric-label">Purpose</p>
+          <p className="metric-value compact">{dataset.data_purpose}</p>
         </div>
         <div className="metric">
           <p className="metric-label">Quality</p>
@@ -64,12 +64,20 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           <Metadata label="dataset_id" value={dataset.dataset_id} />
           <Metadata label="dataset_version_id" value={dataset.dataset_version_id} />
           <Metadata label="dataset_name" value={dataset.name} />
+          <Metadata label="registration_date" value={formatDate(dataset.registration_date)} />
+          <Metadata label="last_updated_date" value={formatDate(dataset.last_updated_date)} />
+          <Metadata label="data_purpose" value={dataset.data_purpose} />
+          <Metadata label="data_format" value={dataset.data_format} />
+          <Metadata label="query_engine" value={dataset.query_engine} />
           <Metadata label="source_link" value={dataset.source_dataset_name} href={dataset.source_url} />
           <Metadata label="record_count" value={dataset.record_count.toLocaleString()} />
           <Metadata label="source_label" value={dataset.source_label} />
-          <Metadata label="task_type" value={dataset.task_type} />
           <Metadata label="mean_tokens" value={formatMetric(metrics["tokens.mean"])} />
           <Metadata label="quality_status" value={dataset.quality_status} />
+        </div>
+        <div className="description-box">
+          <span>dataset_description</span>
+          <p>{dataset.description}</p>
         </div>
       </div>
 
@@ -101,7 +109,39 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
         <div className="panel">
           <div>
             <h2>Quality</h2>
-            <p className="subtle">Generated metrics from the local profiling pipeline.</p>
+            <p className="subtle">{dataset.quality_summary.meaning}</p>
+          </div>
+          <div className="quality-note">
+            <div>
+              <span className={dataset.quality_summary.status === "passed" ? "badge" : "badge warning"}>
+                {dataset.quality_summary.status}
+              </span>
+            </div>
+            <p>{dataset.quality_summary.null_value_policy}</p>
+            <p>
+              Framework: {dataset.quality_summary.framework}
+            </p>
+            <div className="muted-row">
+              Required fields: {dataset.quality_summary.required_fields.join(", ")} · null values measured:{" "}
+              {dataset.quality_summary.total_null_values.toLocaleString()} across{" "}
+              {dataset.quality_summary.fields_with_nulls.toLocaleString()} fields
+            </div>
+          </div>
+          <div className="quality-checks">
+            {dataset.quality_summary.checks.map((check) => (
+              <div className="quality-check" key={check.metric_name}>
+                <div>
+                  <strong>{check.name}</strong>
+                  <span className={check.status === "passed" ? "badge" : check.status === "warning" ? "badge warning" : "badge neutral"}>
+                    {check.status}
+                  </span>
+                </div>
+                <p>{check.description}</p>
+                <div className="muted-row">
+                  {check.metric_name}: {formatMetric(check.metric_value)}
+                </div>
+              </div>
+            ))}
           </div>
           <div className="table-wrap">
             <table>
@@ -136,6 +176,7 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
                 <tr>
                   <th>Field</th>
                   <th>Non-null</th>
+                  <th>Nulls</th>
                   <th>Distinct</th>
                   <th>Mean length</th>
                 </tr>
@@ -145,6 +186,7 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
                   <tr key={field.field_name}>
                     <td>{field.field_name}</td>
                     <td>{field.non_null_count.toLocaleString()}</td>
+                    <td>{field.null_count.toLocaleString()}</td>
                     <td>{field.distinct_count.toLocaleString()}</td>
                     <td>{formatMetric(field.mean_length)}</td>
                   </tr>
@@ -211,4 +253,8 @@ function formatMetric(value: number | undefined) {
     return "0";
   }
   return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2);
+}
+
+function formatDate(value: string) {
+  return value.slice(0, 10);
 }

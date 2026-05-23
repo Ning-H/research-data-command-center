@@ -46,7 +46,7 @@ export default async function DatasetsPage() {
           <thead>
             <tr>
               <th>Dataset</th>
-              <th>Task</th>
+              <th>Purpose</th>
               <th>Version</th>
               <th>Records</th>
               <th>Quality</th>
@@ -62,7 +62,7 @@ export default async function DatasetsPage() {
                   <div className="muted-row">{dataset.source_dataset_name}</div>
                   <div className="muted-row mono">dataset_id {dataset.dataset_id}</div>
                 </td>
-                <td>{dataset.category}</td>
+                <td>{dataset.data_purpose}</td>
                 <td>v{dataset.dataset_version_id}</td>
                 <td>{dataset.record_count.toLocaleString()}</td>
                 <td>

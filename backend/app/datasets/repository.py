@@ -42,7 +42,8 @@ class DatasetRepository:
                     task_type,
                     source_label,
                     COUNT(*) AS record_count,
-                    MAX(created_at) AS created_at
+                    MIN(created_at) AS registration_date,
+                    MAX(created_at) AS last_updated_date
                 FROM dataset_records
                 {where_clause}
                 GROUP BY 1, 2, 3, 4, 5
@@ -61,11 +62,12 @@ class DatasetRepository:
                 latest_versions.task_type,
                 latest_versions.source_label,
                 latest_versions.record_count,
-                latest_versions.created_at,
+                latest_versions.registration_date,
+                latest_versions.last_updated_date,
                 COALESCE(quality.gate_status_numeric, 1) AS gate_status_numeric
             FROM latest_versions
             LEFT JOIN quality USING (dataset_version_id)
-            ORDER BY latest_versions.created_at DESC
+            ORDER BY latest_versions.last_updated_date DESC
             LIMIT ? OFFSET ?
         """.format(where_clause=where_clause)
         params.extend([limit, offset])
@@ -78,9 +80,15 @@ class DatasetRepository:
                 "source_url": _source_url(row["source_dataset_name"]),
                 "source_dataset_name": row["source_dataset_name"],
                 "task_type": row["task_type"],
+                "data_purpose": _data_purpose(row["task_type"]),
+                "data_format": "Parquet",
+                "query_engine": "DuckDB",
+                "description": _description_for_source(row["source_dataset_name"]),
                 "source_label": row["source_label"],
                 "record_count": row["record_count"],
-                "created_at": row["created_at"],
+                "registration_date": row["registration_date"],
+                "last_updated_date": row["last_updated_date"],
+                "created_at": row["registration_date"],
                 "gate_status_numeric": row["gate_status_numeric"],
                 "quality_status": _quality_status(row["gate_status_numeric"]),
                 "category": _category_for_task(row["task_type"]),
@@ -95,11 +103,19 @@ class DatasetRepository:
         dataset = datasets[0]
         storage_dataset_id = _storage_dataset_id_for_display_id(dataset["dataset_id"])
         storage_dataset_version_id = _storage_version_id_for_display_id(dataset["dataset_id"], dataset["dataset_version_id"])
+        quality_metrics = self._get_quality_metrics_by_storage_version(storage_dataset_version_id)
+        full_schema_profile = self._get_schema_profile_by_storage_version(storage_dataset_version_id)
+        schema_profile = full_schema_profile[:12]
         return {
             **dataset,
-            "description": _description_for_source(dataset["source_dataset_name"]),
-            "quality_metrics": self._get_quality_metrics_by_storage_version(storage_dataset_version_id),
-            "schema_profile": self._get_schema_profile_by_storage_version(storage_dataset_version_id, limit=12),
+            "quality_metrics": quality_metrics,
+            "schema_profile": schema_profile,
+            "quality_summary": _quality_summary(
+                quality_metrics=quality_metrics,
+                schema_profile=full_schema_profile,
+                task_type=dataset["task_type"],
+                quality_status=dataset["quality_status"],
+            ),
             "lineage": self._get_lineage_by_storage_ids(storage_dataset_id, storage_dataset_version_id),
             "sample_records": self.list_records(str(dataset["dataset_id"]), str(dataset["dataset_version_id"]), limit=10),
         }
@@ -317,6 +333,16 @@ def _category_for_task(task_type: str) -> str:
     }.get(task_type, task_type.replace("_", " ").title())
 
 
+def _data_purpose(task_type: str) -> str:
+    return {
+        "instruction_tuning": "Training data for instruction tuning",
+        "preference_pair": "Preference and safety alignment data",
+        "summarization": "Summarization training or evaluation data",
+        "question_answering": "Question-answering evaluation data",
+        "coding_eval": "Coding evaluation benchmark data",
+    }.get(task_type, task_type.replace("_", " ").title())
+
+
 def _description_for_source(source_dataset_name: str) -> str:
     return {
         "databricks/databricks-dolly-15k": "Human-written instruction-following data used to bootstrap the dataset catalog and training-data workflow.",
@@ -329,3 +355,82 @@ def _description_for_source(source_dataset_name: str) -> str:
 
 def _quality_status(gate_status_numeric: float | int | None) -> str:
     return "passed" if gate_status_numeric == 0 else "warning"
+
+
+def _quality_summary(
+    quality_metrics: list[dict[str, Any]],
+    schema_profile: list[dict[str, Any]],
+    task_type: str,
+    quality_status: str,
+) -> dict[str, Any]:
+    metrics = {row["metric_name"]: row["metric_value"] for row in quality_metrics}
+    required_empty_count = int(metrics.get("records.empty_required_field_count", 0))
+    duplicate_count = int(metrics.get("records.duplicate_exact_count", 0))
+    pii_match_count = int(metrics.get("pii.fake_test_match_count", 0))
+    total_null_values = sum(int(row.get("null_count", 0)) for row in schema_profile)
+    fields_with_nulls = sum(1 for row in schema_profile if int(row.get("null_count", 0)) > 0)
+    required_fields = _required_fields_for_task(task_type)
+    return {
+        "status": quality_status,
+        "framework": "Custom expectation-style checks inspired by Great Expectations, Soda, dbt tests, and data contract validation.",
+        "meaning": (
+            "passed means every field required for this dataset purpose is populated. "
+            "Duplicates, token lengths, PII scanner matches, and purpose-aware null coverage are measured and surfaced for review."
+        ),
+        "procedure": [
+            "Normalize raw source records into the shared dataset_records schema.",
+            "Profile every normalized field for non-null, null, empty, distinct, and length statistics.",
+            "Apply required-field checks based on data_purpose.",
+            "Detect exact duplicate records with content_hash.",
+            "Compute rough token statistics for input and target text.",
+            "Run the safe regex PII scanner on fake/test patterns only.",
+            "Set the quality gate from required-field failures for the MVP.",
+        ],
+        "required_fields": required_fields,
+        "null_value_policy": (
+            "Nulls are counted field by field. A null fails the gate only when the field is required "
+            "for this dataset purpose; optional fields can be null when they do not apply to the dataset type."
+        ),
+        "total_null_values": total_null_values,
+        "fields_with_nulls": fields_with_nulls,
+        "checks": [
+            {
+                "name": "Required fields",
+                "status": "passed" if required_empty_count == 0 else "warning",
+                "metric_name": "records.empty_required_field_count",
+                "metric_value": required_empty_count,
+                "description": f"Required fields for this purpose: {', '.join(required_fields)}.",
+            },
+            {
+                "name": "Purpose-aware null profile",
+                "status": "measured",
+                "metric_name": "schema.null_values.total",
+                "metric_value": total_null_values,
+                "description": f"{fields_with_nulls} profiled fields contain null or empty values.",
+            },
+            {
+                "name": "Exact duplicates",
+                "status": "review" if duplicate_count else "passed",
+                "metric_name": "records.duplicate_exact_count",
+                "metric_value": duplicate_count,
+                "description": "Duplicates are counted by normalized content_hash.",
+            },
+            {
+                "name": "Safe PII pattern scan",
+                "status": "warning" if pii_match_count else "passed",
+                "metric_name": "pii.fake_test_match_count",
+                "metric_value": pii_match_count,
+                "description": "The MVP scanner uses safe fake/test regex patterns, not real sensitive examples.",
+            },
+        ],
+    }
+
+
+def _required_fields_for_task(task_type: str) -> list[str]:
+    return {
+        "instruction_tuning": ["input_text", "target_text"],
+        "preference_pair": ["input_text", "chosen_text", "rejected_text"],
+        "summarization": ["input_text", "target_text"],
+        "question_answering": ["context", "question", "target_text"],
+        "coding_eval": ["input_text", "target_text"],
+    }.get(task_type, ["input_text", "target_text"])
