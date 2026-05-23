@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from app.datasets.api import get_dataset_repository
 from app.datasets.dolly_ingestion import ingest_dolly_records
+from app.datasets.public_ingestions import ingest_samsum_records
 from app.datasets.repository import DatasetRepository
 from app.main import app
 
@@ -48,5 +49,45 @@ def test_dataset_catalog_and_detail_api(tmp_path: Path) -> None:
         )
         assert records_response.status_code == 200
         assert len(records_response.json()["items"]) == 2
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_dataset_api_filters_catalog_and_searches_records(tmp_path: Path) -> None:
+    result = ingest_samsum_records(
+        storage_root=tmp_path,
+        source_records=[
+            {
+                "id": "s1",
+                "dialogue": "Researcher: Did the eval finish?\nPlatform: The summarization eval passed.",
+                "summary": "The summarization eval passed.",
+            },
+            {
+                "id": "s2",
+                "dialogue": "Researcher: Did training finish?\nPlatform: The run is still active.",
+                "summary": "The training run is still active.",
+            },
+        ],
+    )
+
+    def override_repository() -> DatasetRepository:
+        return DatasetRepository(duckdb_path=Path(result.duckdb_path), storage_root=tmp_path)
+
+    app.dependency_overrides[get_dataset_repository] = override_repository
+    try:
+        client = TestClient(app)
+        catalog_response = client.get("/datasets?q=samsum&task_type=summarization")
+        assert catalog_response.status_code == 200
+        catalog_items = catalog_response.json()["items"]
+        assert len(catalog_items) == 1
+        assert catalog_items[0]["name"] == "SAMSum Dialogue Summarization"
+
+        records_response = client.get(
+            f"/datasets/{result.dataset_id}/versions/{result.dataset_version_id}/records?q=eval"
+        )
+        assert records_response.status_code == 200
+        records = records_response.json()["items"]
+        assert len(records) == 1
+        assert records[0]["source_row_id"] == "s1"
     finally:
         app.dependency_overrides.clear()

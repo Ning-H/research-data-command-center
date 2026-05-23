@@ -16,8 +16,22 @@ def get_dataset_repository() -> DatasetRepository:
 
 
 @router.get("")
-def list_datasets(repository: Annotated[DatasetRepository, Depends(get_dataset_repository)]) -> dict[str, Any]:
-    return {"items": repository.list_datasets()}
+def list_datasets(
+    repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
+    q: str | None = None,
+    task_type: str | None = None,
+    source_label: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> dict[str, Any]:
+    items = repository.list_datasets(
+        q=q,
+        task_type=task_type,
+        source_label=source_label,
+        limit=limit,
+        offset=offset,
+    )
+    return {"items": items, "limit": limit, "offset": offset}
 
 
 @router.get("/{dataset_id}")
@@ -37,12 +51,16 @@ def list_dataset_records(
     dataset_version_id: str,
     repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
     limit: Annotated[int, Query(ge=1, le=200)] = 25,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    q: str | None = None,
 ) -> dict[str, Any]:
     return {
         "items": repository.list_records(
             dataset_id=dataset_id,
             dataset_version_id=dataset_version_id,
             limit=limit,
+            offset=offset,
+            q=q,
         )
     }
 

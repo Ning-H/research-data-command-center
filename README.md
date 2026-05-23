@@ -61,6 +61,13 @@ After Dataset Checkpoint 2 approval, the first ingestion path normalizes Databri
 uv run --python 3.13 python scripts/ingest_dolly.py --limit 100
 ```
 
+Additional sampled public dataset ingestors:
+
+```bash
+uv run --python 3.13 python scripts/ingest_public_dataset.py hh-rlhf --limit 100
+uv run --python 3.13 python scripts/ingest_public_dataset.py samsum --limit 100
+```
+
 Generated raw, object-store, Parquet, and DuckDB files are written under `storage/` and intentionally ignored by git.
 
 Next product work should continue through the checkpoint flow before broadening beyond this dataset foundation.

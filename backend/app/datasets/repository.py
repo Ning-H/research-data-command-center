@@ -11,9 +11,28 @@ class DatasetRepository:
         self.duckdb_path = duckdb_path
         self.storage_root = storage_root
 
-    def list_datasets(self) -> list[dict[str, Any]]:
+    def list_datasets(
+        self,
+        q: str | None = None,
+        task_type: str | None = None,
+        source_label: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
         if not self.duckdb_path.exists():
             return []
+        filters: list[str] = []
+        params: list[Any] = []
+        if q:
+            filters.append("(source_dataset_name ILIKE ? OR task_type ILIKE ?)")
+            params.extend([f"%{q}%", f"%{q}%"])
+        if task_type:
+            filters.append("task_type = ?")
+            params.append(task_type)
+        if source_label:
+            filters.append("source_label = ?")
+            params.append(source_label)
+        where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
         query = """
             WITH latest_versions AS (
                 SELECT
@@ -25,6 +44,7 @@ class DatasetRepository:
                     COUNT(*) AS record_count,
                     MAX(created_at) AS created_at
                 FROM dataset_records
+                {where_clause}
                 GROUP BY 1, 2, 3, 4, 5
             ),
             quality AS (
@@ -46,8 +66,10 @@ class DatasetRepository:
             FROM latest_versions
             LEFT JOIN quality USING (dataset_version_id)
             ORDER BY latest_versions.created_at DESC
-        """
-        rows = self._query(query)
+            LIMIT ? OFFSET ?
+        """.format(where_clause=where_clause)
+        params.extend([limit, offset])
+        rows = self._query(query, params)
         return [
             {
                 **row,
@@ -66,7 +88,7 @@ class DatasetRepository:
         dataset_version_id = dataset["dataset_version_id"]
         return {
             **dataset,
-            "description": "Human-written instruction-following data used to bootstrap the dataset catalog and training-data workflow.",
+            "description": _description_for_source(dataset["source_dataset_name"]),
             "quality_metrics": self.get_quality_metrics(dataset_id, dataset_version_id),
             "schema_profile": self.get_schema_profile(dataset_id, dataset_version_id, limit=12),
             "lineage": self.get_lineage(dataset_id, dataset_version_id),
@@ -78,9 +100,19 @@ class DatasetRepository:
         dataset_id: str,
         dataset_version_id: str,
         limit: int = 25,
+        offset: int = 0,
+        q: str | None = None,
     ) -> list[dict[str, Any]]:
+        filters = ["dataset_id = ?", "dataset_version_id = ?"]
+        params: list[Any] = [dataset_id, dataset_version_id]
+        if q:
+            filters.append(
+                "(instruction ILIKE ? OR context ILIKE ? OR response_text ILIKE ? OR category ILIKE ?)"
+            )
+            params.extend([f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"])
+        params.extend([limit, offset])
         return self._query(
-            """
+            f"""
             SELECT
                 record_id,
                 source_split,
@@ -92,11 +124,11 @@ class DatasetRepository:
                 response_text,
                 content_hash
             FROM dataset_records
-            WHERE dataset_id = ? AND dataset_version_id = ?
-            ORDER BY CAST(source_row_id AS INTEGER)
-            LIMIT ?
+            WHERE {" AND ".join(filters)}
+            ORDER BY TRY_CAST(source_row_id AS INTEGER), source_row_id
+            LIMIT ? OFFSET ?
             """,
-            [dataset_id, dataset_version_id, limit],
+            params,
         )
 
     def get_quality_metrics(self, dataset_id: str, dataset_version_id: str) -> list[dict[str, Any]]:
@@ -171,13 +203,25 @@ class DatasetRepository:
 def _display_name(source_dataset_name: str) -> str:
     return {
         "databricks/databricks-dolly-15k": "Databricks Dolly 15k",
+        "Anthropic/hh-rlhf": "Anthropic HH-RLHF",
+        "knkarthick/samsum": "SAMSum Dialogue Summarization",
     }.get(source_dataset_name, source_dataset_name)
 
 
 def _category_for_task(task_type: str) -> str:
     return {
         "instruction_tuning": "Instruction tuning",
+        "preference_pair": "Preference / safety",
+        "summarization": "Summarization",
     }.get(task_type, task_type.replace("_", " ").title())
+
+
+def _description_for_source(source_dataset_name: str) -> str:
+    return {
+        "databricks/databricks-dolly-15k": "Human-written instruction-following data used to bootstrap the dataset catalog and training-data workflow.",
+        "Anthropic/hh-rlhf": "Chosen/rejected assistant responses for preference, helpfulness, and safety research workflows.",
+        "knkarthick/samsum": "Dialogue-summary pairs for summarization training and evaluation workflows.",
+    }.get(source_dataset_name, "Versioned public dataset normalized into the shared research-data schema.")
 
 
 def _quality_status(gate_status_numeric: float | int | None) -> str:
