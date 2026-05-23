@@ -3,10 +3,13 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.datasets.api import get_dataset_repository
+from app.datasets.api import get_dataset_storage_root
 from app.datasets.dolly_ingestion import ingest_dolly_records
 from app.datasets.public_ingestions import ingest_samsum_records
 from app.datasets.repository import DatasetRepository
 from app.main import app
+from app.research_programs.lifecycle import register_research_program
+from app.research_programs.repository import ResearchProgramRepository
 
 
 def test_dataset_catalog_and_detail_api(tmp_path: Path) -> None:
@@ -67,6 +70,63 @@ def test_dataset_catalog_and_detail_api(tmp_path: Path) -> None:
         records_response = client.get("/datasets/1/versions/1/records?limit=2")
         assert records_response.status_code == 200
         assert len(records_response.json()["items"]) == 2
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_dataset_access_records_research_program_usage(tmp_path: Path) -> None:
+    result = ingest_dolly_records(
+        storage_root=tmp_path,
+        source_records=[
+            {
+                "instruction": f"Use dataset example {index}",
+                "context": "Program-linking test context.",
+                "response": "Program-linking test response.",
+                "category": "open_qa",
+            }
+            for index in range(5)
+        ],
+    )
+    register_research_program(
+        storage_root=tmp_path,
+        payload={
+            "program_name": "Dataset access linking test",
+            "status": "active",
+            "researcher_names": ["Lena Keys"],
+        },
+    )
+
+    def override_repository() -> DatasetRepository:
+        return DatasetRepository(duckdb_path=Path(result.duckdb_path), storage_root=tmp_path)
+
+    app.dependency_overrides[get_dataset_repository] = override_repository
+    app.dependency_overrides[get_dataset_storage_root] = lambda: tmp_path
+    try:
+        client = TestClient(app)
+        access_response = client.post(
+            "/datasets/1/versions/1/access",
+            json={
+                "program_id": 1,
+                "access_purpose": "training_export",
+                "user_id": "Lena Keys",
+            },
+        )
+        assert access_response.status_code == 200
+        access = access_response.json()
+        assert access["linked_dataset_ids"] == [1]
+        assert access["linked_dataset_versions"] == [
+            {"dataset_id": 1, "dataset_version_id": 1}
+        ]
+
+        program = ResearchProgramRepository(
+            duckdb_path=Path(result.duckdb_path),
+            storage_root=tmp_path,
+        ).get_program(1)
+        assert program is not None
+        assert program["linked_dataset_ids"] == [1]
+        assert program["linked_dataset_versions"] == [
+            {"dataset_id": 1, "dataset_version_id": 1}
+        ]
     finally:
         app.dependency_overrides.clear()
 

@@ -38,6 +38,7 @@ APP_METADATA_TABLES: tuple[TableContract, ...] = (
             "success_metrics_json",
             "tags_json",
             "linked_dataset_ids_json",
+            "linked_dataset_versions_json",
             "linked_experiment_ids_json",
             "linked_run_ids_json",
             "decision_notes",
@@ -119,6 +120,7 @@ APP_METADATA_TABLES: tuple[TableContract, ...] = (
         storage_layer="postgres",
         columns=(
             "run_id",
+            "program_id",
             "experiment_id",
             "run_config_id",
             "dataset_version_id",

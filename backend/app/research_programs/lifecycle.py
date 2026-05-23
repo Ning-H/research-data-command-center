@@ -17,6 +17,7 @@ JSON_LIST_FIELDS = {
     "success_metrics",
     "tags",
     "linked_dataset_ids",
+    "linked_dataset_versions",
     "linked_experiment_ids",
     "linked_run_ids",
 }
@@ -49,6 +50,10 @@ class RegisteredResearchProgram:
     researcher_names: list[str]
     created_at: str
     updated_at: str
+
+
+def research_program_exists(storage_root: Path, program_id: int) -> bool:
+    return _program_path(storage_root, program_id).exists()
 
 
 def register_research_program(storage_root: Path, payload: dict[str, Any]) -> RegisteredResearchProgram:
@@ -171,6 +176,7 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
     success_metrics = _string_list(payload, "success_metrics")
     tags = _string_list(payload, "tags")
     linked_dataset_ids = [int(value) for value in _list_value(payload, "linked_dataset_ids")]
+    linked_dataset_versions = _dataset_version_refs(payload)
     linked_experiment_ids = [int(value) for value in _list_value(payload, "linked_experiment_ids")]
     linked_run_ids = [int(value) for value in _list_value(payload, "linked_run_ids")]
     return {
@@ -191,6 +197,7 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
         "success_metrics_json": json.dumps(success_metrics, sort_keys=True),
         "tags_json": json.dumps(tags, sort_keys=True),
         "linked_dataset_ids_json": json.dumps(linked_dataset_ids, sort_keys=True),
+        "linked_dataset_versions_json": json.dumps(linked_dataset_versions, sort_keys=True),
         "linked_experiment_ids_json": json.dumps(linked_experiment_ids, sort_keys=True),
         "linked_run_ids_json": json.dumps(linked_run_ids, sort_keys=True),
         "decision_notes": str(payload.get("decision_notes") or "").strip(),
@@ -208,6 +215,84 @@ def _string_list(payload: dict[str, Any], key: str) -> list[str]:
 
 def _text_value(payload: dict[str, Any], key: str, legacy_key: str) -> str:
     return str(payload.get(key) or payload.get(legacy_key) or "").strip()
+
+
+def attach_research_program_links(
+    storage_root: Path,
+    program_id: int,
+    dataset_ids: list[int] | None = None,
+    dataset_versions: list[dict[str, int]] | None = None,
+    experiment_ids: list[int] | None = None,
+    run_ids: list[int] | None = None,
+    updated_by_user_id: str | None = None,
+) -> dict[str, Any]:
+    path = _program_path(storage_root, program_id)
+    frame = _read_parquet_if_exists(path)
+    if frame.empty:
+        raise ValueError(f"program_id {program_id} does not exist")
+    current = frame.iloc[0].to_dict()
+    updates = {
+        "linked_dataset_ids": _merge_ints(
+            _list_value(current, "linked_dataset_ids"),
+            dataset_ids or [],
+        ),
+        "linked_dataset_versions": _merge_dataset_version_refs(
+            _dataset_version_refs(current),
+            dataset_versions or [],
+        ),
+        "linked_experiment_ids": _merge_ints(
+            _list_value(current, "linked_experiment_ids"),
+            experiment_ids or [],
+        ),
+        "linked_run_ids": _merge_ints(_list_value(current, "linked_run_ids"), run_ids or []),
+    }
+    if updated_by_user_id:
+        updates["updated_by_user_id"] = updated_by_user_id
+    updated = update_research_program(storage_root=storage_root, program_id=program_id, payload=updates)
+    return {
+        **updated,
+        "linked_dataset_ids": json.loads(updated["linked_dataset_ids_json"]),
+        "linked_dataset_versions": json.loads(updated["linked_dataset_versions_json"]),
+        "linked_experiment_ids": json.loads(updated["linked_experiment_ids_json"]),
+        "linked_run_ids": json.loads(updated["linked_run_ids_json"]),
+    }
+
+
+def _merge_ints(existing: list[Any], additions: list[int]) -> list[int]:
+    merged = {int(value) for value in existing}
+    merged.update(int(value) for value in additions)
+    return sorted(merged)
+
+
+def _merge_dataset_version_refs(
+    existing: list[dict[str, int]],
+    additions: list[dict[str, int]],
+) -> list[dict[str, int]]:
+    refs = {
+        (int(ref["dataset_id"]), int(ref["dataset_version_id"]))
+        for ref in [*existing, *additions]
+    }
+    return [
+        {"dataset_id": dataset_id, "dataset_version_id": dataset_version_id}
+        for dataset_id, dataset_version_id in sorted(refs)
+    ]
+
+
+def _dataset_version_refs(payload: dict[str, Any]) -> list[dict[str, int]]:
+    raw_value = payload.get("linked_dataset_versions")
+    if raw_value is None:
+        raw_value = payload.get("linked_dataset_versions_json")
+    if isinstance(raw_value, str) and raw_value:
+        raw_value = json.loads(raw_value)
+    if raw_value is None:
+        return []
+    return [
+        {
+            "dataset_id": int(ref["dataset_id"]),
+            "dataset_version_id": int(ref["dataset_version_id"]),
+        }
+        for ref in list(raw_value)
+    ]
 
 
 def _list_value(payload: dict[str, Any], key: str) -> list[Any]:

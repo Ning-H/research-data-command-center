@@ -3,6 +3,8 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.research_programs.lifecycle import register_research_program
+from app.research_programs.repository import ResearchProgramRepository
 from app.runs.api import get_run_repository, get_run_storage_root
 from app.runs.ingestion import seed_demo_runs
 from app.runs.repository import RunRepository
@@ -66,6 +68,14 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
             for index in range(40)
         ],
     )
+    register_research_program(
+        storage_root=tmp_path,
+        payload={
+            "program_name": "Run registration linking test",
+            "status": "active",
+            "researcher_names": ["Lena Keys"],
+        },
+    )
 
     def override_repository() -> RunRepository:
         return RunRepository(
@@ -81,6 +91,7 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
             "/runs/register",
             json={
                 "run_name": "api-registered-real-run",
+                "program_id": 1,
                 "dataset_id": 1,
                 "dataset_version_id": 1,
                 "base_model_name": "numpy-softmax-text-classifier",
@@ -95,6 +106,7 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
         assert register_response.status_code == 200
         run_id = register_response.json()["run_id"]
         assert run_id == 1
+        assert register_response.json()["program_id"] == 1
 
         event_response = client.post(
             f"/runs/{run_id}/events",
@@ -142,6 +154,18 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
         assert detail["metric_summary"]["final_loss"] == 1.2
         assert detail["compute_summary"]["avg_process_memory_mb"] == 120.0
         assert detail["checkpoints"][0]["checkpoint_id"] == 1001
+
+        program = ResearchProgramRepository(
+            duckdb_path=tmp_path / "duckdb" / "research_command_center.duckdb",
+            storage_root=tmp_path,
+        ).get_program(1)
+        assert program is not None
+        assert program["linked_dataset_ids"] == [1]
+        assert program["linked_dataset_versions"] == [
+            {"dataset_id": 1, "dataset_version_id": 1}
+        ]
+        assert program["linked_experiment_ids"] == [1]
+        assert program["linked_run_ids"] == [run_id]
 
         search_response = client.get(
             "/checkpoints",

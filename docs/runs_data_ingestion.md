@@ -42,10 +42,12 @@ quality, privacy, provenance, and lineage for datasets it knows about.
 The run registration request must include both:
 
 ```text
+program_id
 dataset_id
 dataset_version_id
 ```
 
+`program_id` attaches the run to the research program that motivated the work.
 Together, `dataset_id` and `dataset_version_id` identify the governed training
 dataset version and the Parquet record partitions the researcher should connect
 to for training. `dataset_id` identifies the dataset family; `dataset_version_id`
@@ -55,6 +57,7 @@ Minimum registration context:
 
 ```text
 run_name
+program_id
 dataset_id
 dataset_version_id
 base_model_name or parent_model_version_id
@@ -75,6 +78,17 @@ POST /runs/{run_id}/checkpoints -> appends checkpoint metadata
 POST /runs/{run_id}/complete -> closes the run as completed, failed, or killed
 ```
 
+Dataset access also carries research-program context. When a researcher exports
+or fetches a dataset version for training, the API should receive `program_id`
+and automatically attach the data asset/version to that program:
+
+```text
+POST /datasets/{dataset_id}/versions/{dataset_version_id}/access
+```
+
+That means the research-program page can later show which data assets were
+actually used by a program without relying only on manual curation.
+
 The preferred real local trainer for this project is:
 
 ```text
@@ -83,6 +97,7 @@ scripts/train_registered_torch_classifier.py
 
 It behaves like a researcher's external training job:
 
+- records dataset access with `program_id`, `dataset_id`, and `dataset_version_id`
 - reads registered dataset records through the API using `dataset_id` and `dataset_version_id`
 - registers a new run through `POST /runs/register`
 - trains a small PyTorch text classifier outside the application

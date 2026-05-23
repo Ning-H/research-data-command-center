@@ -39,6 +39,7 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
                 "success_metrics": ["coverage_score", "depth_score", "example_quality_score"],
                 "tags": ["study_material", "python_algorithms", "long_form_generation"],
                 "linked_dataset_ids": [1],
+                "linked_dataset_versions": [{"dataset_id": 1, "dataset_version_id": 1}],
                 "linked_experiment_ids": [1],
                 "linked_run_ids": [7],
                 "decision_notes": "Seeded from the owner experience for the first demo program.",
@@ -61,6 +62,7 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
         assert detail["initiating_context"] == "A user asked for Python algorithms study materials and received a weak final document."
         assert detail["research_objectives"] == "Learn which data and eval recipe improves study guide quality."
         assert detail["linked_dataset_ids"] == [1]
+        assert detail["linked_dataset_versions"] == [{"dataset_id": 1, "dataset_version_id": 1}]
         assert detail["linked_experiment_ids"] == [1]
         assert detail["linked_run_ids"] == [7]
         assert detail["ui_workflow"]["can_update_from_ui"] is True

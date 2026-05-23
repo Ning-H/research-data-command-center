@@ -21,6 +21,13 @@ TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_']+")
 def main() -> None:
     args = parse_args()
     client = httpx.Client(base_url=args.api_base_url, timeout=30.0)
+    if args.program_id is not None:
+        record_dataset_access(
+            client=client,
+            program_id=args.program_id,
+            dataset_id=args.dataset_id,
+            dataset_version_id=args.dataset_version_id,
+        )
     records = fetch_records(
         client=client,
         dataset_id=args.dataset_id,
@@ -112,6 +119,7 @@ def main() -> None:
     post_json(client, f"/runs/{run_id}/complete", {"status": "completed", "ended_at": utc_now()})
     manifest = {
         "run_id": run_id,
+        "program_id": args.program_id,
         "dataset_id": args.dataset_id,
         "dataset_version_id": args.dataset_version_id,
         "records": len(records),
@@ -134,6 +142,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--dataset-id", type=int, default=1)
     parser.add_argument("--dataset-version-id", type=int, default=1)
+    parser.add_argument("--program-id", type=int, default=None)
     parser.add_argument("--records", type=int, default=160)
     parser.add_argument("--epochs", type=int, default=6)
     parser.add_argument("--batch-size", type=int, default=32)
@@ -156,6 +165,23 @@ def fetch_records(
     return response.json()["items"]
 
 
+def record_dataset_access(
+    client: httpx.Client,
+    program_id: int,
+    dataset_id: int,
+    dataset_version_id: int,
+) -> None:
+    response = client.post(
+        f"/datasets/{dataset_id}/versions/{dataset_version_id}/access",
+        json={
+            "program_id": program_id,
+            "access_purpose": "training_export",
+            "user_id": "user_demo_owner",
+        },
+    )
+    response.raise_for_status()
+
+
 def register_run(
     client: httpx.Client,
     args: argparse.Namespace,
@@ -165,6 +191,7 @@ def register_run(
     payload = {
         "run_name": args.run_name,
         "experiment_name": "real-api-ingestion-smoke-test",
+        "program_id": args.program_id,
         "dataset_id": args.dataset_id,
         "dataset_version_id": args.dataset_version_id,
         "base_model_name": "numpy-softmax-text-classifier",
@@ -181,6 +208,7 @@ def register_run(
         "run_config": {
             "dataset_id": args.dataset_id,
             "dataset_version_id": args.dataset_version_id,
+            "program_id": args.program_id,
             "epochs": args.epochs,
             "batch_size": args.batch_size,
             "learning_rate": args.learning_rate,

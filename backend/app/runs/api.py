@@ -63,6 +63,7 @@ def register_training_run(
     return {
         "run_id": result.run_id,
         "run_config_id": result.run_config_id,
+        "program_id": result.program_id,
         "dataset_id": result.dataset_id,
         "dataset_version_id": result.dataset_version_id,
         "status": result.status,

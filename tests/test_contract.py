@@ -81,8 +81,14 @@ def test_core_lineage_tables_keep_foreign_keys_explicit() -> None:
     assert {"program_description", "problem_statement", "research_objectives"}.issubset(
         tables["research_programs"].columns
     )
-    assert {"linked_dataset_ids_json", "linked_experiment_ids_json", "linked_run_ids_json"}.issubset(
-        tables["research_programs"].columns
+    assert {
+        "linked_dataset_ids_json",
+        "linked_dataset_versions_json",
+        "linked_experiment_ids_json",
+        "linked_run_ids_json",
+    }.issubset(tables["research_programs"].columns)
+    assert {"program_id", "run_id", "dataset_version_id"}.issubset(
+        tables["training_runs"].columns
     )
     assert {"run_id", "dataset_version_id"}.issubset(tables["checkpoints"].columns)
     assert {"checkpoint_id", "run_id", "dataset_id", "dataset_version_id"}.issubset(

@@ -18,6 +18,19 @@ class ResearchCommandCenterClient:
     def list_datasets(self) -> dict[str, Any]:
         return self._get("/datasets")
 
+    def list_research_programs(
+        self,
+        tag: str | None = None,
+        q: str | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+        params = {"tag": tag, "q": q, "status": status}
+        query = str(httpx.QueryParams({key: value for key, value in params.items() if value is not None}))
+        return self._get(f"/research-programs?{query}")
+
+    def get_research_program(self, program_id: str | int) -> dict[str, Any]:
+        return self._get(f"/research-programs/{program_id}")
+
     def get_dataset(self, dataset_id: str) -> dict[str, Any]:
         return self._get(f"/datasets/{dataset_id}")
 
@@ -34,6 +47,19 @@ class ResearchCommandCenterClient:
 
     def trace_dataset_lineage(self, dataset_id: str, version_id: str) -> dict[str, Any]:
         return self._get(f"/datasets/{dataset_id}/versions/{version_id}/lineage")
+
+    def record_dataset_access(
+        self,
+        program_id: str | int,
+        dataset_id: str | int,
+        version_id: str | int,
+        access_purpose: str = "training_export",
+        user_id: str | None = None,
+    ) -> dict[str, Any]:
+        payload = {"program_id": int(program_id), "access_purpose": access_purpose}
+        if user_id:
+            payload["user_id"] = user_id
+        return self._post(f"/datasets/{dataset_id}/versions/{version_id}/access", payload)
 
     def list_runs(self) -> dict[str, Any]:
         return self._get("/runs")

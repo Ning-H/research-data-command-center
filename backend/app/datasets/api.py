@@ -7,12 +7,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import settings
 from app.datasets.repository import DatasetRepository
+from app.research_programs.lifecycle import attach_research_program_links
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
 
 
 def get_dataset_repository() -> DatasetRepository:
     return DatasetRepository(duckdb_path=Path(settings.duckdb_path), storage_root=Path("."))
+
+
+def get_dataset_storage_root() -> Path:
+    return Path(settings.raw_storage_root).parent
 
 
 @router.get("")
@@ -104,4 +109,39 @@ def get_dataset_lineage(
             dataset_id=dataset_id,
             dataset_version_id=dataset_version_id,
         )
+    }
+
+
+@router.post("/{dataset_id}/versions/{dataset_version_id}/access")
+def record_dataset_access(
+    dataset_id: int,
+    dataset_version_id: int,
+    payload: dict[str, Any],
+    repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+) -> dict[str, Any]:
+    dataset = repository.get_dataset(str(dataset_id))
+    if dataset is None:
+        raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_id}")
+    program_id = int(payload["program_id"])
+    try:
+        program = attach_research_program_links(
+            storage_root=storage_root,
+            program_id=program_id,
+            dataset_ids=[dataset_id],
+            dataset_versions=[
+                {"dataset_id": dataset_id, "dataset_version_id": int(dataset_version_id)}
+            ],
+            updated_by_user_id=payload.get("user_id") or payload.get("updated_by_user_id"),
+        )
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {
+        "program_id": program_id,
+        "dataset_id": dataset_id,
+        "dataset_version_id": dataset_version_id,
+        "access_purpose": payload.get("access_purpose", "not_provided"),
+        "linked_dataset_ids": program["linked_dataset_ids"],
+        "linked_dataset_versions": program["linked_dataset_versions"],
+        "note": "Dataset usage recorded against the research program from an API access request.",
     }

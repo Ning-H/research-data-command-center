@@ -10,6 +10,7 @@ import duckdb
 import pandas as pd
 
 from app.datasets.repository import _storage_dataset_id_for_display_id, _storage_version_id_for_display_id
+from app.research_programs.lifecycle import attach_research_program_links, research_program_exists
 from app.runs.ingestion import register_run_duckdb_views
 from research_command_center_contract.enums import CheckpointStatus, RunStatus, SourcePriority
 
@@ -18,6 +19,7 @@ from research_command_center_contract.enums import CheckpointStatus, RunStatus, 
 class RegisteredRun:
     run_id: int
     run_config_id: int
+    program_id: int | None
     dataset_id: int
     dataset_version_id: int
     status: str
@@ -42,6 +44,9 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
     dataset_id = int(payload["dataset_id"])
     dataset_version_id = int(payload["dataset_version_id"])
     _validate_registered_dataset(storage_root, dataset_id, dataset_version_id)
+    program_id = int(payload["program_id"]) if payload.get("program_id") is not None else None
+    if program_id is not None and not research_program_exists(storage_root, program_id):
+        raise ValueError(f"program_id {program_id} does not exist")
 
     duckdb_path = storage_root / "duckdb" / "research_command_center.duckdb"
     register_run_duckdb_views(storage_root=storage_root, duckdb_path=duckdb_path)
@@ -61,6 +66,7 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
                 "event_type": "run_registered",
                 "run_id": run_id,
                 "timestamp": started_at,
+                "program_id": program_id,
                 "dataset_id": dataset_id,
                 "dataset_version_id": dataset_version_id,
                 "run_name": payload["run_name"],
@@ -77,6 +83,7 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
         {
             "run_id": run_id,
             "run_config_id": run_config_id,
+            "program_id": program_id,
             "dataset_id": dataset_id,
             "dataset_version_id": dataset_version_id,
             "raw_events_uri": str(raw_path),
@@ -107,6 +114,7 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
         [
             {
                 "run_id": run_id,
+                "program_id": program_id,
                 "experiment_id": int(payload.get("experiment_id", 1)),
                 "run_config_id": run_config_id,
                 "dataset_id": dataset_id,
@@ -136,9 +144,22 @@ def register_run(storage_root: Path, payload: dict[str, Any]) -> RegisteredRun:
         _training_run_path(storage_root, run_id),
     )
     register_run_duckdb_views(storage_root=storage_root, duckdb_path=duckdb_path)
+    if program_id is not None:
+        attach_research_program_links(
+            storage_root=storage_root,
+            program_id=program_id,
+            dataset_ids=[dataset_id],
+            dataset_versions=[
+                {"dataset_id": dataset_id, "dataset_version_id": dataset_version_id}
+            ],
+            experiment_ids=[int(payload.get("experiment_id", 1))],
+            run_ids=[run_id],
+            updated_by_user_id=created_by_user_id,
+        )
     return RegisteredRun(
         run_id=run_id,
         run_config_id=run_config_id,
+        program_id=program_id,
         dataset_id=dataset_id,
         dataset_version_id=dataset_version_id,
         status=RunStatus.RUNNING.value,
