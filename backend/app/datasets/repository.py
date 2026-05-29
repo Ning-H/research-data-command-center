@@ -302,6 +302,90 @@ class DatasetRepository:
         storage_dataset_version_id = _storage_version_id_for_display_id(dataset_id, dataset_version_id)
         return self._get_lineage_by_storage_ids(storage_dataset_id, storage_dataset_version_id)
 
+    def get_experiment_handoff(
+        self,
+        dataset_id: str,
+        dataset_version_id: str,
+    ) -> dict[str, Any] | None:
+        dataset_version = self.get_dataset_version(dataset_id, dataset_version_id)
+        if dataset_version is None:
+            return None
+
+        public_dataset_id = int(dataset_id)
+        public_dataset_version_id = int(dataset_version_id)
+        iteration_manifest = _read_dataset_iteration_manifest(
+            storage_root=self.storage_root,
+            dataset_id=public_dataset_id,
+            dataset_version_id=public_dataset_version_id,
+        )
+        candidates = self._included_candidates_for_dataset_version(
+            dataset_id=public_dataset_id,
+            dataset_version_id=public_dataset_version_id,
+            candidate_ids=[
+                int(candidate_id)
+                for candidate_id in iteration_manifest.get("included_candidate_ids", [])
+            ],
+        )
+        failure_type_counts: dict[str, int] = {}
+        severity_counts: dict[str, int] = {}
+        source_model_version_ids: set[int] = set()
+        source_eval_run_ids: set[int] = set()
+        source_failure_ids: set[int] = set()
+        for candidate in candidates:
+            failure_type = str(candidate.get("failure_type") or "unknown")
+            severity = str(candidate.get("severity") or "unknown")
+            failure_type_counts[failure_type] = failure_type_counts.get(failure_type, 0) + 1
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            source_model_version_ids.add(int(candidate.get("source_model_version_id") or 0))
+            source_eval_run_ids.add(int(candidate.get("source_eval_run_id") or 0))
+            source_failure_ids.add(int(candidate.get("eval_failure_id") or 0))
+
+        ready_for_next_experiment = bool(candidates)
+        dominant_failure_type = _dominant_count_value(failure_type_counts)
+        return {
+            "dataset_version": {
+                "dataset_id": public_dataset_id,
+                "dataset_version_id": public_dataset_version_id,
+                "name": dataset_version["name"],
+                "record_count": dataset_version["record_count"],
+                "quality_score": dataset_version["quality_score"],
+                "quality_label": dataset_version["quality_label"],
+                "parent_dataset_version_id": int(
+                    iteration_manifest.get("parent_dataset_version_id") or 0
+                ),
+            },
+            "iteration_manifest": iteration_manifest,
+            "source_candidates": candidates,
+            "failure_summary": {
+                "candidate_count": len(candidates),
+                "source_eval_failure_ids": sorted(value for value in source_failure_ids if value),
+                "source_eval_run_ids": sorted(value for value in source_eval_run_ids if value),
+                "source_model_version_ids": sorted(value for value in source_model_version_ids if value),
+                "by_failure_type": _sorted_count_dict(failure_type_counts),
+                "by_severity": _sorted_count_dict(severity_counts),
+            },
+            "recommended_next_experiment": {
+                "ready": ready_for_next_experiment,
+                "program_id": int(candidates[0].get("program_id") or 0) if candidates else 0,
+                "experiment_id": int(candidates[0].get("experiment_id") or 0) if candidates else 0,
+                "variant_name": f"failure_replay_dataset_v{public_dataset_version_id}",
+                "linked_datasets": [
+                    {
+                        "dataset_id": public_dataset_id,
+                        "dataset_version_id": public_dataset_version_id,
+                    }
+                ],
+                "research_intent": (
+                    "Run the next study-material experiment with the candidate-derived "
+                    f"dataset version and check whether {dominant_failure_type or 'captured failures'} improve."
+                ),
+                "evaluation_requirement": (
+                    "Compare against the same eval suite and rubric metrics used by the source "
+                    "model versions before promoting the next checkpoint."
+                ),
+            },
+        }
+
     def _get_lineage_by_storage_ids(
         self,
         storage_dataset_id: str,
@@ -353,6 +437,94 @@ class DatasetRepository:
             [storage_dataset_version_id],
         )
         return int(rows[0]["record_count"] or 0) if rows else 0
+
+    def _included_candidates_for_dataset_version(
+        self,
+        dataset_id: int,
+        dataset_version_id: int,
+        candidate_ids: list[int],
+    ) -> list[dict[str, Any]]:
+        if not self._has_table("dataset_candidates"):
+            return []
+        filters = ["dc.included_dataset_id = ?", "dc.included_dataset_version_id = ?"]
+        params: list[Any] = [dataset_id, dataset_version_id]
+        if candidate_ids:
+            placeholders = ", ".join("?" for _ in candidate_ids)
+            filters.append(f"dc.dataset_candidate_id IN ({placeholders})")
+            params.extend(candidate_ids)
+
+        joins = ""
+        select_fields = [
+            "dc.dataset_candidate_id",
+            "dc.eval_failure_id",
+            "dc.source_eval_run_id",
+            "dc.source_eval_output_id",
+            "dc.source_model_version_id",
+            "dc.program_id",
+            "dc.experiment_id",
+            "dc.target_dataset_id",
+            "dc.failure_type",
+            "dc.status AS candidate_status",
+            "dc.proposed_input_text",
+            "dc.proposed_target_text",
+            "dc.review_notes",
+            "dc.created_at",
+            "dc.reviewed_at",
+            "dc.included_dataset_id",
+            "dc.included_dataset_version_id",
+            "dc.included_at",
+        ]
+        if self._has_table("eval_failures"):
+            joins += " LEFT JOIN eval_failures ef ON dc.eval_failure_id = ef.eval_failure_id"
+            select_fields.extend(
+                [
+                    "ef.severity",
+                    "ef.status AS failure_status",
+                    "ef.failure_reason",
+                    "ef.dataset_id AS source_dataset_id",
+                    "ef.dataset_version_id AS source_dataset_version_id",
+                ]
+            )
+        else:
+            select_fields.extend(
+                [
+                    "'' AS severity",
+                    "'' AS failure_status",
+                    "'' AS failure_reason",
+                    "0 AS source_dataset_id",
+                    "0 AS source_dataset_version_id",
+                ]
+            )
+        if self._has_table("eval_outputs"):
+            joins += " LEFT JOIN eval_outputs eo ON dc.source_eval_output_id = eo.eval_output_id"
+            select_fields.extend(["eo.prompt_text", "eo.output_text"])
+        else:
+            select_fields.extend(["'' AS prompt_text", "'' AS output_text"])
+        if self._has_table("model_versions"):
+            joins += " LEFT JOIN model_versions mv ON dc.source_model_version_id = mv.model_version_id"
+            select_fields.extend(["mv.model_name", "mv.model_version_name"])
+        else:
+            select_fields.extend(["'' AS model_name", "'' AS model_version_name"])
+
+        return self._query(
+            f"""
+            SELECT {", ".join(select_fields)}
+            FROM dataset_candidates dc
+            {joins}
+            WHERE {" AND ".join(filters)}
+            ORDER BY dc.dataset_candidate_id
+            """,
+            params,
+        )
+
+    def _has_table(self, table_name: str) -> bool:
+        if not self.duckdb_path.exists():
+            return False
+        try:
+            self._query(f"SELECT 1 FROM {table_name} LIMIT 1")
+        except duckdb.Error:
+            return False
+        return True
 
     def _query(self, query: str, params: list[Any] | None = None) -> list[dict[str, Any]]:
         connection = duckdb.connect(str(self.duckdb_path), read_only=True)
@@ -608,6 +780,37 @@ def _read_dataset_manifest(
     if not path.exists():
         return {}
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _read_dataset_iteration_manifest(
+    storage_root: Path,
+    dataset_id: int,
+    dataset_version_id: int,
+) -> dict[str, Any]:
+    path = (
+        storage_root
+        / "object_store"
+        / "dataset_iterations"
+        / f"dataset_id={dataset_id}"
+        / f"dataset_version_id={dataset_version_id}"
+        / "iteration_manifest.json"
+    )
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _dominant_count_value(counts: dict[str, int]) -> str:
+    if not counts:
+        return ""
+    return max(counts.items(), key=lambda item: (item[1], item[0]))[0]
+
+
+def _sorted_count_dict(counts: dict[str, int]) -> list[dict[str, Any]]:
+    return [
+        {"value": value, "count": count}
+        for value, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+    ]
 
 
 def _quality_summary(

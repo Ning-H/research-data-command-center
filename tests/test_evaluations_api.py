@@ -312,6 +312,22 @@ def test_eval_run_failures_can_be_saved_as_dataset_candidates(tmp_path: Path) ->
         assert included_candidate["included_dataset_id"] == 1
         assert included_candidate["included_dataset_version_id"] == 2
 
+        handoff = client.get("/datasets/1/versions/2/experiment-handoff").json()
+        assert handoff["dataset_version"]["dataset_id"] == 1
+        assert handoff["dataset_version"]["dataset_version_id"] == 2
+        assert handoff["dataset_version"]["parent_dataset_version_id"] == 1
+        assert handoff["failure_summary"]["candidate_count"] == 1
+        assert handoff["failure_summary"]["source_eval_failure_ids"] == [failure_id]
+        assert handoff["failure_summary"]["by_failure_type"] == [
+            {"value": "shallow_explanation", "count": 1}
+        ]
+        assert handoff["source_candidates"][0]["dataset_candidate_id"] == candidate_id
+        assert handoff["source_candidates"][0]["failure_reason"] == "Missing depth and examples."
+        assert handoff["recommended_next_experiment"]["ready"] is True
+        assert handoff["recommended_next_experiment"]["linked_datasets"] == [
+            {"dataset_id": 1, "dataset_version_id": 2}
+        ]
+
         included_iterations = client.get(
             "/dataset-iterations",
             params={"experiment_id": 1, "target_dataset_id": 1, "status": "approved"},

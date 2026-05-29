@@ -284,6 +284,21 @@ def get_dataset_lineage(
     }
 
 
+@router.get("/{dataset_id}/versions/{dataset_version_id}/experiment-handoff")
+def get_dataset_experiment_handoff(
+    dataset_id: str,
+    dataset_version_id: str,
+    repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
+) -> dict[str, Any]:
+    handoff = repository.get_experiment_handoff(dataset_id, dataset_version_id)
+    if handoff is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Dataset version not found: dataset_id={dataset_id}, dataset_version_id={dataset_version_id}",
+        )
+    return handoff
+
+
 @router.post("/{dataset_id}/versions/{dataset_version_id}/access")
 def record_dataset_access(
     dataset_id: int,
