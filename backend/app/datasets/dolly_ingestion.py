@@ -374,10 +374,11 @@ def register_duckdb_views(storage_root: Path, duckdb_path: Path) -> None:
         }
         for view_name, pattern in view_patterns.items():
             escaped_pattern = str(pattern).replace("'", "''")
+            hive_partitioning = "false" if view_name == "dataset_lineage" else "true"
             connection.execute(
                 f"""
                 CREATE OR REPLACE VIEW {view_name} AS
-                SELECT * FROM read_parquet('{escaped_pattern}', hive_partitioning = true, union_by_name = true)
+                SELECT * FROM read_parquet('{escaped_pattern}', hive_partitioning = {hive_partitioning}, union_by_name = true)
                 """
             )
     finally:

@@ -24,7 +24,7 @@ export default async function CheckpointsPage({ searchParams = {} }: Checkpoints
             selected ranking rule.
           </p>
         </div>
-        <Link className="button secondary" href="/training-runs">
+        <Link className="btn btn--secondary" href="/training-runs">
           Training Runs
           <ArrowRight aria-hidden="true" size={16} />
         </Link>
@@ -120,7 +120,7 @@ export default async function CheckpointsPage({ searchParams = {} }: Checkpoints
                   <span className="mono">{checkpoint.checkpoint_uri}</span>
                 </td>
                 <td>
-                  <Link className="button secondary" href={`/models/promote?checkpoint_id=${checkpoint.checkpoint_id}`}>
+                  <Link className="btn btn--secondary" href={`/models/promote?checkpoint_id=${checkpoint.checkpoint_id}`}>
                     Promote
                   </Link>
                 </td>

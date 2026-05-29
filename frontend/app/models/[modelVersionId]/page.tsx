@@ -29,7 +29,7 @@ export default async function ModelDetailPage({ params }: ModelDetailPageProps) 
             Evaluation and comparison results will attach here next.
           </p>
         </div>
-        <Link className="button secondary" href="/models-checkpoints">
+        <Link className="btn btn--secondary" href="/models-checkpoints">
           <ArrowLeft aria-hidden="true" size={16} />
           Models & Checkpoints
         </Link>

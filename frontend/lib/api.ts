@@ -285,6 +285,110 @@ export type RunDetail = RunSummary & {
   };
 };
 
+export type ResearchProgramSummary = {
+  program_id: number;
+  program_name: string;
+  short_name: string;
+  program_description: string;
+  problem_statement: string;
+  initiating_context: string;
+  research_goal: string;
+  hypothesis: string;
+  research_objectives: string;
+  status: string;
+  research_area: string;
+  current_focus: string;
+  owner_name: string;
+  researcher_names: string[];
+  tags: string[];
+  linked_dataset_ids?: number[];
+  linked_dataset_versions?: Array<{ dataset_id: number; dataset_version_id: number }>;
+  linked_datasets?: Array<{ dataset_id: number; dataset_version_id: number }>;
+  linked_experiment_ids?: number[];
+  linked_run_ids?: number[];
+  notes: Array<{ note_id: number; body: string; author_name: string; created_at: string }>;
+  input_source: string;
+  created_at: string;
+  updated_at: string;
+  created_by_user_id: string;
+  updated_by_user_id: string;
+};
+
+export type ResearchProgramDetail = ResearchProgramSummary & {
+  ui_workflow: {
+    can_update_from_ui: boolean;
+    supported_actions: string[];
+  };
+};
+
+export type ResearchProgramPayload = Partial<
+  Pick<
+    ResearchProgramSummary,
+    | "program_name"
+    | "short_name"
+    | "program_description"
+    | "problem_statement"
+    | "initiating_context"
+    | "research_goal"
+    | "hypothesis"
+    | "research_objectives"
+    | "status"
+    | "research_area"
+    | "current_focus"
+    | "owner_name"
+    | "researcher_names"
+    | "tags"
+    | "notes"
+  >
+>;
+
+export type ResearchProgramCreateResponse = {
+  program_id: number;
+  program_name: string;
+  status: string;
+  researcher_names: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listResearchPrograms(params: Record<string, string | number | undefined> = {}): Promise<ResearchProgramSummary[]> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const payload = await getJson<{ items: ResearchProgramSummary[] }>(`/research-programs${suffix}`);
+  return payload.items;
+}
+
+export async function getResearchProgram(programId: string): Promise<ResearchProgramDetail> {
+  return getJson<ResearchProgramDetail>(`/research-programs/${programId}`);
+}
+
+export async function createResearchProgram(payload: ResearchProgramPayload): Promise<ResearchProgramCreateResponse> {
+  return postJson<ResearchProgramCreateResponse>("/research-programs", payload);
+}
+
+export async function updateResearchProgram(programId: string, payload: ResearchProgramPayload): Promise<ResearchProgramDetail> {
+  return patchJson<ResearchProgramDetail>(`/research-programs/${programId}`, payload);
+}
+
+export async function appendResearchProgramNote(
+  programId: string,
+  payload: { body: string; author_name?: string },
+): Promise<{ note_id: number; notes: ResearchProgramSummary["notes"]; program: ResearchProgramDetail }> {
+  return postJson(`/research-programs/${programId}/notes`, payload);
+}
+
+export async function deleteResearchProgramNote(
+  programId: string,
+  noteId: number,
+): Promise<{ deleted_note_id: number; notes: ResearchProgramSummary["notes"]; program: ResearchProgramDetail }> {
+  return deleteJson(`/research-programs/${programId}/notes/${noteId}`);
+}
+
 export async function listDatasets(): Promise<DatasetSummary[]> {
   const payload = await getJson<{ items: DatasetSummary[] }>("/datasets");
   return payload.items;
@@ -345,6 +449,32 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
       "Content-Type": "application/json",
     },
     method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+async function patchJson<T>(path: string, payload: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    body: JSON.stringify(payload),
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "PATCH",
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+async function deleteJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    cache: "no-store",
+    method: "DELETE",
   });
   if (!response.ok) {
     throw new Error(`API request failed: ${response.status} ${response.statusText}`);

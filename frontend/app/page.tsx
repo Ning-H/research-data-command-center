@@ -32,7 +32,7 @@ export default async function HomePage() {
             which data/run/checkpoint caused it, and what the team should try next.
           </p>
         </div>
-        <Link className="button" href="/research-programs">
+        <Link className="btn btn--primary" href="/research-programs">
           <BrainCircuit aria-hidden="true" size={17} />
           Open Programs
         </Link>
@@ -60,42 +60,42 @@ export default async function HomePage() {
       <div className="placeholder-grid">
         <LifecycleCard
           href="/research-programs"
-          icon={<BrainCircuit aria-hidden="true" color="#0f766e" size={22} />}
+          icon={<BrainCircuit aria-hidden="true" className="accent-icon" size={22} />}
           title="Research Programs"
         >
           Group hypotheses, experiments, data mixtures, model behavior changes, and next actions.
         </LifecycleCard>
         <LifecycleCard
           href="/data-assets"
-          icon={<Database aria-hidden="true" color="#0f766e" size={22} />}
+          icon={<Database aria-hidden="true" className="accent-icon" size={22} />}
           title="Data Assets"
         >
           Register public and generated data, validate quality, version it, and create mixtures.
         </LifecycleCard>
         <LifecycleCard
           href="/experiments"
-          icon={<FlaskConical aria-hidden="true" color="#0f766e" size={22} />}
+          icon={<FlaskConical aria-hidden="true" className="accent-icon" size={22} />}
           title="Experiments"
         >
           Track the research question and expected metric movement before inspecting runs.
         </LifecycleCard>
         <LifecycleCard
           href="/training-runs"
-          icon={<LineChart aria-hidden="true" color="#0f766e" size={22} />}
+          icon={<LineChart aria-hidden="true" className="accent-icon" size={22} />}
           title="Training Runs"
         >
           Ingest external run configs, raw metrics, checkpoints, and compute telemetry.
         </LifecycleCard>
         <LifecycleCard
           href="/models-checkpoints"
-          icon={<Boxes aria-hidden="true" color="#0f766e" size={22} />}
+          icon={<Boxes aria-hidden="true" className="accent-icon" size={22} />}
           title="Models & Checkpoints"
         >
           Promote ranked checkpoints into immutable model versions with derived lineage.
         </LifecycleCard>
         <LifecycleCard
           href="/evaluations"
-          icon={<ClipboardCheck aria-hidden="true" color="#0f766e" size={22} />}
+          icon={<ClipboardCheck aria-hidden="true" className="accent-icon" size={22} />}
           title="Evaluations"
         >
           Compare model versions, track regressions, and send failed cases to the failure library.
@@ -162,7 +162,7 @@ function LifecycleCard({
       {icon}
       <h2>{title}</h2>
       <p className="subtle">{children}</p>
-      <Link className="button secondary" href={href}>
+      <Link className="btn btn--secondary" href={href}>
         Open <ArrowRight aria-hidden="true" size={16} />
       </Link>
     </div>

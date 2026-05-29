@@ -9,6 +9,8 @@ from typing import Any
 import duckdb
 import pandas as pd
 
+from app.experiments.lifecycle import attach_experiment_links
+from app.research_programs.lifecycle import attach_research_program_links
 from app.runs.ingestion import register_run_duckdb_views
 from research_command_center_contract.enums import (
     CheckpointStatus,
@@ -65,6 +67,8 @@ def register_model_from_checkpoint(
         "model_version_name": model_version_name,
         "checkpoint_id": checkpoint_id,
         "run_id": checkpoint["run_id"],
+        "program_id": checkpoint.get("program_id"),
+        "experiment_id": checkpoint.get("experiment_id"),
         "dataset_id": checkpoint["dataset_id"],
         "dataset_version_id": checkpoint["dataset_version_id"],
         "artifact_uri": artifact_uri,
@@ -80,6 +84,8 @@ def register_model_from_checkpoint(
         "model_version_name": model_version_name,
         "checkpoint_id": checkpoint_id,
         "run_id": int(checkpoint["run_id"]),
+        "program_id": int(checkpoint.get("program_id") or 0),
+        "experiment_id": int(checkpoint.get("experiment_id") or 0),
         "dataset_id": int(checkpoint["dataset_id"]),
         "dataset_version_id": int(checkpoint["dataset_version_id"]),
         "run_config_id": int(checkpoint["run_config_id"]),
@@ -105,6 +111,19 @@ def register_model_from_checkpoint(
     _write_parquet([row], _model_version_path(storage_root, model_version_id))
     _mark_checkpoint_promoted(storage_root=storage_root, checkpoint=checkpoint)
     register_model_duckdb_views(storage_root=storage_root, duckdb_path=duckdb_path)
+    if row["experiment_id"]:
+        attach_experiment_links(
+            storage_root=storage_root,
+            experiment_id=row["experiment_id"],
+            model_version_ids=[model_version_id],
+            updated_by_user_id=created_by_user_id,
+        )
+    if row["program_id"]:
+        attach_research_program_links(
+            storage_root=storage_root,
+            program_id=row["program_id"],
+            updated_by_user_id=created_by_user_id,
+        )
 
     return RegisteredModelVersion(
         model_id=model_id,
@@ -148,6 +167,8 @@ def _checkpoint_context(duckdb_path: Path, checkpoint_id: int) -> dict[str, Any]
                 SELECT
                     cp.checkpoint_id,
                     cp.run_id,
+                    tr.program_id,
+                    tr.experiment_id,
                     tr.dataset_id,
                     cp.dataset_version_id,
                     tr.run_config_id,

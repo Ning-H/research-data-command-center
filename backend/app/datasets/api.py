@@ -6,10 +6,22 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import settings
+from app.datasets.lifecycle import (
+    append_dataset_draft_records,
+    create_dataset_draft,
+    create_dataset_version,
+    create_dataset_version_from_candidates,
+    get_dataset_ingestion_job,
+    overwrite_dataset_draft_records,
+    publish_dataset_draft,
+    register_dataset,
+    validate_dataset_draft,
+)
 from app.datasets.repository import DatasetRepository
 from app.research_programs.lifecycle import attach_research_program_links
 
 router = APIRouter(prefix="/datasets", tags=["datasets"])
+jobs_router = APIRouter(prefix="/dataset-ingestion-jobs", tags=["datasets"])
 
 
 def get_dataset_repository() -> DatasetRepository:
@@ -50,6 +62,155 @@ def get_dataset(
     return dataset
 
 
+@router.get("/{dataset_id}/versions")
+def list_dataset_versions(
+    dataset_id: str,
+    repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
+) -> dict[str, Any]:
+    items = repository.list_dataset_versions(dataset_id)
+    if not items:
+        raise HTTPException(status_code=404, detail=f"Dataset not found: {dataset_id}")
+    return {"items": items}
+
+
+@router.get("/{dataset_id}/versions/{dataset_version_id}")
+def get_dataset_version(
+    dataset_id: str,
+    dataset_version_id: str,
+    repository: Annotated[DatasetRepository, Depends(get_dataset_repository)],
+) -> dict[str, Any]:
+    dataset = repository.get_dataset_version(dataset_id, dataset_version_id)
+    if dataset is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Dataset version not found: dataset_id={dataset_id}, dataset_version_id={dataset_version_id}",
+        )
+    return dataset
+
+
+@router.post("/register")
+def register_dataset_endpoint(
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+) -> dict[str, Any]:
+    try:
+        return register_dataset(storage_root=storage_root, payload=payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{dataset_id}/versions")
+def create_dataset_version_endpoint(
+    dataset_id: int,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+) -> dict[str, Any]:
+    try:
+        return create_dataset_version(storage_root=storage_root, dataset_id=dataset_id, payload=payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{dataset_id}/versions/from-candidates")
+def create_dataset_version_from_candidates_endpoint(
+    dataset_id: int,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+) -> dict[str, Any]:
+    try:
+        return create_dataset_version_from_candidates(
+            storage_root=storage_root,
+            dataset_id=dataset_id,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{dataset_id}/versions/draft")
+def create_dataset_draft_endpoint(
+    dataset_id: int,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+) -> dict[str, Any]:
+    try:
+        return create_dataset_draft(storage_root=storage_root, dataset_id=dataset_id, payload=payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{dataset_id}/versions/{draft_id}/append")
+def append_dataset_draft_endpoint(
+    dataset_id: int,
+    draft_id: str,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+) -> dict[str, Any]:
+    try:
+        return append_dataset_draft_records(
+            storage_root=storage_root,
+            dataset_id=dataset_id,
+            draft_id=draft_id,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{dataset_id}/versions/{draft_id}/overwrite")
+def overwrite_dataset_draft_endpoint(
+    dataset_id: int,
+    draft_id: str,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+) -> dict[str, Any]:
+    try:
+        return overwrite_dataset_draft_records(
+            storage_root=storage_root,
+            dataset_id=dataset_id,
+            draft_id=draft_id,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{dataset_id}/versions/{draft_id}/validate")
+def validate_dataset_draft_endpoint(
+    dataset_id: int,
+    draft_id: str,
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    try:
+        return validate_dataset_draft(
+            storage_root=storage_root,
+            dataset_id=dataset_id,
+            draft_id=draft_id,
+            payload=payload or {},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/{dataset_id}/versions/{draft_id}/publish")
+def publish_dataset_draft_endpoint(
+    dataset_id: int,
+    draft_id: str,
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+    payload: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    try:
+        return publish_dataset_draft(
+            storage_root=storage_root,
+            dataset_id=dataset_id,
+            draft_id=draft_id,
+            payload=payload or {},
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.get("/{dataset_id}/versions/{dataset_version_id}/records")
 def list_dataset_records(
     dataset_id: str,
@@ -68,6 +229,17 @@ def list_dataset_records(
             q=q,
         )
     }
+
+
+@jobs_router.get("/{job_id}")
+def get_dataset_ingestion_job_endpoint(
+    job_id: int,
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+) -> dict[str, Any]:
+    job = get_dataset_ingestion_job(storage_root=storage_root, job_id=job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Dataset ingestion job not found: {job_id}")
+    return job
 
 
 @router.get("/{dataset_id}/versions/{dataset_version_id}/quality")

@@ -15,7 +15,6 @@ def test_experiments_can_be_registered_under_research_programs(tmp_path: Path) -
         storage_root=tmp_path,
         payload={
             "program_name": "Improve structured technical study-material generation",
-            "short_name": "Python algorithms study guides",
             "status": "active",
             "owner_name": "Lena Keys",
             "researcher_names": ["Lena Keys", "Miles Drums"],
@@ -54,6 +53,7 @@ def test_experiments_can_be_registered_under_research_programs(tmp_path: Path) -
                         "variant_name": "baseline_direct_answer",
                         "variant_type": "control",
                         "description": "Use existing instruction-tuning data only.",
+                        "linked_datasets": [{"dataset_id": 1, "dataset_version_id": 1}],
                     },
                     {
                         "variant_name": "outline_first_guides",
@@ -86,6 +86,7 @@ def test_experiments_can_be_registered_under_research_programs(tmp_path: Path) -
         assert detail["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
         assert detail["variants"][1]["variant_name"] == "outline_first_guides"
         assert detail["variants"][0]["variant_type"] == "control"
+        assert detail["variants"][0]["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
         assert "data_recipe" not in detail["variants"][0]
         assert "current_focus" not in detail
         assert "data_strategy" not in detail

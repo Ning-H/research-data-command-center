@@ -25,7 +25,7 @@ export default async function DataAssetsPage() {
             eval datasets, safety/red-team data, inference trace samples, and failure-derived data.
           </p>
         </div>
-        <Link className="button secondary" href="/datasets">
+        <Link className="btn btn--secondary" href="/datasets">
           Legacy dataset catalog
           <ArrowRight aria-hidden="true" size={16} />
         </Link>
@@ -108,7 +108,7 @@ export default async function DataAssetsPage() {
                   <div className="muted-row">{dataset.source_dataset_name}</div>
                 </td>
                 <td>
-                  <Link className="button secondary" href={`/datasets/${dataset.dataset_id}`}>
+                  <Link className="btn btn--secondary" href={`/datasets/${dataset.dataset_id}`}>
                     Detail
                     <ArrowRight aria-hidden="true" size={16} />
                   </Link>

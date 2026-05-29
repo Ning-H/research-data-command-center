@@ -191,6 +191,7 @@ def _demo_payload(
     return {
         "run_id": run_id,
         "run_config_id": run_config_id,
+        "program_id": 1,
         "experiment_id": 1,
         "run_name": run_name,
         "experiment_name": experiment_name,
@@ -334,6 +335,7 @@ def _run_config_row(payload: dict[str, Any], config_path: Path) -> dict[str, Any
 def _training_run_row(payload: dict[str, Any], raw_path: Path) -> dict[str, Any]:
     return {
         "run_id": payload["run_id"],
+        "program_id": payload.get("program_id"),
         "experiment_id": payload["experiment_id"],
         "run_config_id": payload["run_config_id"],
         "dataset_id": payload["dataset_id"],

@@ -35,7 +35,7 @@ export function LifecyclePage({
           <p className="subtle">{description}</p>
         </div>
         {primaryHref ? (
-          <Link className="button secondary" href={primaryHref}>
+          <Link className="btn btn--secondary" href={primaryHref}>
             {primaryLabel}
             <ArrowRight aria-hidden="true" size={16} />
           </Link>

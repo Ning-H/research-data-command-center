@@ -41,6 +41,26 @@ class ResearchCommandCenterClient:
     ) -> dict[str, Any]:
         return self._patch(f"/research-programs/{program_id}", payload)
 
+    def append_research_program_note(
+        self,
+        program_id: str | int,
+        body: str,
+        author_name: str | None = None,
+    ) -> dict[str, Any]:
+        payload = {"body": body}
+        if author_name:
+            payload["author_name"] = author_name
+        return self._post(f"/research-programs/{program_id}/notes", payload)
+
+    def delete_research_program_note(
+        self,
+        program_id: str | int,
+        note_id: str | int,
+        user_id: str | None = None,
+    ) -> dict[str, Any]:
+        payload = {"user_id": user_id} if user_id else None
+        return self._delete(f"/research-programs/{program_id}/notes/{note_id}", payload)
+
     def list_experiments(
         self,
         program_id: str | int | None = None,
@@ -78,6 +98,73 @@ class ResearchCommandCenterClient:
 
     def get_dataset(self, dataset_id: str) -> dict[str, Any]:
         return self._get(f"/datasets/{dataset_id}")
+
+    def list_dataset_versions(self, dataset_id: str | int) -> dict[str, Any]:
+        return self._get(f"/datasets/{dataset_id}/versions")
+
+    def get_dataset_version(self, dataset_id: str | int, version_id: str | int) -> dict[str, Any]:
+        return self._get(f"/datasets/{dataset_id}/versions/{version_id}")
+
+    def register_dataset(self, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post("/datasets/register", payload)
+
+    def create_dataset_version(self, dataset_id: str | int, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post(f"/datasets/{dataset_id}/versions", payload)
+
+    def create_dataset_version_from_candidates(
+        self,
+        dataset_id: str | int,
+        candidate_ids: list[int] | None = None,
+        candidate_status: str = "approved",
+        version_notes: str | None = None,
+        created_by_user_id: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"candidate_status": candidate_status}
+        if candidate_ids is not None:
+            payload["candidate_ids"] = candidate_ids
+        if version_notes is not None:
+            payload["version_notes"] = version_notes
+        if created_by_user_id is not None:
+            payload["created_by_user_id"] = created_by_user_id
+        return self._post(f"/datasets/{dataset_id}/versions/from-candidates", payload)
+
+    def create_dataset_draft(self, dataset_id: str | int, payload: dict[str, Any]) -> dict[str, Any]:
+        return self._post(f"/datasets/{dataset_id}/versions/draft", payload)
+
+    def append_dataset_draft(
+        self,
+        dataset_id: str | int,
+        draft_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._post(f"/datasets/{dataset_id}/versions/{draft_id}/append", payload)
+
+    def overwrite_dataset_draft(
+        self,
+        dataset_id: str | int,
+        draft_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._post(f"/datasets/{dataset_id}/versions/{draft_id}/overwrite", payload)
+
+    def validate_dataset_draft(
+        self,
+        dataset_id: str | int,
+        draft_id: str,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self._post(f"/datasets/{dataset_id}/versions/{draft_id}/validate", payload or {})
+
+    def publish_dataset_draft(
+        self,
+        dataset_id: str | int,
+        draft_id: str,
+        payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return self._post(f"/datasets/{dataset_id}/versions/{draft_id}/publish", payload or {})
+
+    def get_dataset_ingestion_job(self, job_id: str | int) -> dict[str, Any]:
+        return self._get(f"/dataset-ingestion-jobs/{job_id}")
 
     def search_dataset_records(
         self,
@@ -192,6 +279,110 @@ class ResearchCommandCenterClient:
     def trace_model_lineage(self, model_version_id: str | int) -> dict[str, Any]:
         return self._get(f"/models/{model_version_id}/lineage")
 
+    def get_model_evals(self, model_version_id: str | int) -> dict[str, Any]:
+        return self._get(f"/models/{model_version_id}/evals")
+
+    def compare_models(
+        self,
+        model_version_ids: list[int],
+        baseline_model_version_id: str | int | None = None,
+        experiment_id: str | int | None = None,
+        eval_suite_id: str | int | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {"model_version_ids": model_version_ids}
+        if baseline_model_version_id is not None:
+            payload["baseline_model_version_id"] = int(baseline_model_version_id)
+        if experiment_id is not None:
+            payload["experiment_id"] = int(experiment_id)
+        if eval_suite_id is not None:
+            payload["eval_suite_id"] = int(eval_suite_id)
+        return self._post("/models/compare", payload)
+
+    def get_evaluation_summary(
+        self,
+        program_id: str | int | None = None,
+        experiment_id: str | int | None = None,
+        eval_suite_id: str | int | None = None,
+        model_version_id: str | int | None = None,
+    ) -> dict[str, Any]:
+        params = {
+            "program_id": program_id,
+            "experiment_id": experiment_id,
+            "eval_suite_id": eval_suite_id,
+            "model_version_id": model_version_id,
+        }
+        query = str(httpx.QueryParams({key: value for key, value in params.items() if value is not None}))
+        return self._get(f"/evaluations/summary?{query}")
+
+    def search_eval_failures(
+        self,
+        experiment_id: str | int | None = None,
+        failure_type: str | None = None,
+        severity: str | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+        params = {
+            "experiment_id": experiment_id,
+            "failure_type": failure_type,
+            "severity": severity,
+            "status": status,
+        }
+        query = str(httpx.QueryParams({key: value for key, value in params.items() if value is not None}))
+        return self._get(f"/failure-library?{query}")
+
+    def get_eval_failure(self, eval_failure_id: str | int) -> dict[str, Any]:
+        return self._get(f"/failure-library/{eval_failure_id}")
+
+    def list_dataset_candidates(
+        self,
+        program_id: str | int | None = None,
+        experiment_id: str | int | None = None,
+        target_dataset_id: str | int | None = None,
+        failure_type: str | None = None,
+        source_model_version_id: str | int | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+        params = {
+            "program_id": program_id,
+            "experiment_id": experiment_id,
+            "target_dataset_id": target_dataset_id,
+            "failure_type": failure_type,
+            "source_model_version_id": source_model_version_id,
+            "status": status,
+        }
+        query = str(httpx.QueryParams({key: value for key, value in params.items() if value is not None}))
+        return self._get(f"/dataset-candidates?{query}")
+
+    def review_dataset_candidate(
+        self,
+        candidate_id: str | int,
+        status: str,
+        review_notes: str = "",
+        reviewed_by_user_id: str | None = None,
+    ) -> dict[str, Any]:
+        payload = {"status": status, "review_notes": review_notes}
+        if reviewed_by_user_id is not None:
+            payload["reviewed_by_user_id"] = reviewed_by_user_id
+        return self._patch(f"/dataset-candidates/{candidate_id}", payload)
+
+    def list_dataset_iterations(
+        self,
+        program_id: str | int | None = None,
+        experiment_id: str | int | None = None,
+        target_dataset_id: str | int | None = None,
+        failure_type: str | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+        params = {
+            "program_id": program_id,
+            "experiment_id": experiment_id,
+            "target_dataset_id": target_dataset_id,
+            "failure_type": failure_type,
+            "status": status,
+        }
+        query = str(httpx.QueryParams({key: value for key, value in params.items() if value is not None}))
+        return self._get(f"/dataset-iterations?{query}")
+
     def _get(self, path: str) -> dict[str, Any]:
         with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
             response = client.get(path)
@@ -207,5 +398,11 @@ class ResearchCommandCenterClient:
     def _patch(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
             response = client.patch(path, json=payload)
+            response.raise_for_status()
+            return response.json()
+
+    def _delete(self, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
+            response = client.request("DELETE", path, json=payload)
             response.raise_for_status()
             return response.json()

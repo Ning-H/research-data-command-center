@@ -19,6 +19,8 @@ class RunRepository:
             """
             SELECT
                 run_id,
+                program_id,
+                experiment_id,
                 run_name,
                 experiment_name,
                 dataset_id,
@@ -48,6 +50,8 @@ class RunRepository:
             """
             SELECT
                 run_id,
+                program_id,
+                experiment_id,
                 run_name,
                 experiment_name,
                 dataset_id,
@@ -332,11 +336,16 @@ class RunRepository:
         metric_summary = self.get_metric_summary(row["run_id"])
         checkpoints = self.list_checkpoints(row["run_id"])
         health_summary = _health_summary(row, metric_summary, checkpoints)
+        model_version_status = (
+            "promoted"
+            if any(checkpoint.get("status") == "promoted" for checkpoint in checkpoints)
+            else "not_promoted_yet"
+        )
         return {
             **row,
             "health_summary": health_summary,
             "checkpoint_count": len(checkpoints),
-            "model_version_status": "not_promoted_yet",
+            "model_version_status": model_version_status,
         }
 
     def _run_row(self, run_id: str | int) -> dict[str, Any] | None:

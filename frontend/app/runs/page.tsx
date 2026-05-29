@@ -24,7 +24,7 @@ export default async function RunsPage() {
           </p>
         </div>
         <div className="action-row">
-          <Link className="button secondary" href="/runs/checkpoints">
+          <Link className="btn btn--secondary" href="/runs/checkpoints">
             Checkpoints
             <ArrowRight aria-hidden="true" size={16} />
           </Link>
@@ -117,7 +117,7 @@ export default async function RunsPage() {
                 </td>
                 <td>{run.ingest_source}</td>
                 <td>
-                  <Link className="button secondary" href={`/runs/${run.run_id}`}>
+                  <Link className="btn btn--secondary" href={`/runs/${run.run_id}`}>
                     Detail
                     <ArrowRight aria-hidden="true" size={16} />
                   </Link>

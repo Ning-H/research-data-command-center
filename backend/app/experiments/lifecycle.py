@@ -334,6 +334,7 @@ def _variant_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     variant.get("variant_type") or ("control" if index == 1 else "test")
                 ).strip(),
                 "description": str(variant.get("description") or "").strip(),
+                "linked_datasets": _linked_dataset_refs(variant),
             }
         )
     return normalized

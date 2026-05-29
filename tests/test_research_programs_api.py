@@ -24,7 +24,6 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
             "/research-programs",
             json={
                 "program_name": "Improve structured technical study-material generation",
-                "short_name": "Python algorithms study guides",
                 "program_description": "Improve long-form educational artifacts for technical learners.",
                 "problem_statement": "Generated Python algorithm study guides are shallow and uneven.",
                 "initiating_context": "A user asked for Python algorithms study materials and received a weak final document.",
@@ -40,7 +39,12 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
                 "linked_datasets": [{"dataset_id": 1, "dataset_version_id": 1}],
                 "linked_experiment_ids": [1],
                 "linked_run_ids": [7],
-                "decision_notes": "Seeded from the owner experience for the first demo program.",
+                "notes": [
+                    {
+                        "body": "Seeded from the owner experience for the first demo program.",
+                        "author_name": "minion1",
+                    }
+                ],
             },
         )
         assert create_response.status_code == 200
@@ -56,14 +60,18 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
         assert detail_response.status_code == 200
         detail = detail_response.json()
         assert detail["program_name"] == "Improve structured technical study-material generation"
+        assert "short_name" not in detail
         assert detail["program_description"] == "Improve long-form educational artifacts for technical learners."
         assert detail["initiating_context"] == "A user asked for Python algorithms study materials and received a weak final document."
         assert detail["research_objectives"] == "Learn which data and eval recipe improves study guide quality."
         assert detail["linked_datasets"] == [{"dataset_id": 1, "dataset_version_id": 1}]
         assert detail["linked_experiment_ids"] == [1]
         assert detail["linked_run_ids"] == [7]
+        assert detail["notes"][0]["body"] == "Seeded from the owner experience for the first demo program."
+        assert "decision_notes" not in detail
         assert detail["ui_workflow"]["can_update_from_ui"] is True
         assert "attach_training_runs" in detail["ui_workflow"]["supported_actions"]
+        assert "append_note" in detail["ui_workflow"]["supported_actions"]
         assert "success_metrics" not in detail
         assert all(not key.endswith("_json") for key in detail)
 
@@ -89,5 +97,31 @@ def test_research_programs_can_be_registered_and_updated_for_ui(tmp_path: Path) 
         assert patched["status"] == "paused"
         assert patched["research_objectives"] == "Measure whether structured data improves study guide quality."
         assert patched["researcher_names"] == ["minion1", "minion2", "minion3"]
+
+        note_response = client.post(
+            "/research-programs/1/notes",
+            json={"body": "Keep the first evaluation slice narrow.", "author_name": "minion2"},
+        )
+        assert note_response.status_code == 200
+        note_payload = note_response.json()
+        assert note_payload["note_id"] == 2
+        assert note_payload["notes"][1]["author_name"] == "minion2"
+        assert note_payload["program"]["notes"][1]["body"] == "Keep the first evaluation slice narrow."
+        assert "delete_note" in note_payload["program"]["ui_workflow"]["supported_actions"]
+
+        delete_response = client.request(
+            "DELETE",
+            "/research-programs/1/notes/1",
+            json={"user_id": "minion2"},
+        )
+        assert delete_response.status_code == 200
+        delete_payload = delete_response.json()
+        assert delete_payload["deleted_note_id"] == 1
+        assert [note["note_id"] for note in delete_payload["notes"]] == [2]
+        assert delete_payload["program"]["notes"][0]["body"] == "Keep the first evaluation slice narrow."
+
+        missing_note_response = client.request("DELETE", "/research-programs/1/notes/99")
+        assert missing_note_response.status_code == 404
+        assert "note_id 99 does not exist" in missing_note_response.json()["detail"]
     finally:
         app.dependency_overrides.clear()

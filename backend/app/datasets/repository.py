@@ -1,9 +1,29 @@
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 from typing import Any
 
 import duckdb
+
+
+API_RECORD_FIELDS: tuple[str, ...] = (
+    "record_id",
+    "source_split",
+    "source_row_id",
+    "category",
+    "task_type",
+    "input_text",
+    "instruction",
+    "context",
+    "question",
+    "chosen_text",
+    "rejected_text",
+    "target_text",
+    "response_text",
+    "content_hash",
+)
 
 
 class DatasetRepository:
@@ -80,21 +100,89 @@ class DatasetRepository:
         """.format(where_clause=where_clause)
         params.extend([limit, offset])
         rows = self._query(query, params)
-        return [
-            _dataset_summary_from_row(row)
-            for row in rows
-        ]
+        return [_dataset_summary_from_row(row, self.storage_root) for row in rows]
 
     def get_dataset(self, dataset_id: str) -> dict[str, Any] | None:
-        datasets = [dataset for dataset in self.list_datasets() if str(dataset["dataset_id"]) == str(dataset_id)]
-        if not datasets:
+        versions = self.list_dataset_versions(dataset_id)
+        if not versions:
             return None
-        dataset = datasets[0]
+        latest_version = max(versions, key=lambda version: int(version["dataset_version_id"]))
+        return self.get_dataset_version(dataset_id, str(latest_version["dataset_version_id"]))
+
+    def list_dataset_versions(self, dataset_id: str) -> list[dict[str, Any]]:
+        if not self.duckdb_path.exists():
+            return []
+        storage_dataset_id = _storage_dataset_id_for_display_id(dataset_id)
+        rows = self._query(
+            """
+            WITH versions AS (
+                SELECT
+                    dataset_id,
+                    dataset_version_id,
+                    source_dataset_name,
+                    task_type,
+                    source_label,
+                    COUNT(*) AS record_count,
+                    MIN(created_at) AS registration_date,
+                    MAX(created_at) AS last_updated_date
+                FROM dataset_records
+                WHERE dataset_id = ?
+                GROUP BY 1, 2, 3, 4, 5
+            ),
+            quality AS (
+                SELECT
+                    dataset_version_id,
+                    MAX(CASE WHEN metric_name = 'quality.gate_status_numeric' THEN metric_value END) AS gate_status_numeric,
+                    MAX(CASE WHEN metric_name = 'records.total' THEN metric_value END) AS records_total,
+                    MAX(CASE WHEN metric_name = 'records.empty_required_field_count' THEN metric_value END) AS required_empty_count,
+                    MAX(CASE WHEN metric_name = 'records.duplicate_exact_count' THEN metric_value END) AS duplicate_count,
+                    MAX(CASE WHEN metric_name = 'pii.fake_test_match_count' THEN metric_value END) AS pii_match_count
+                FROM dataset_quality_reports
+                GROUP BY 1
+            )
+            SELECT
+                versions.dataset_id,
+                versions.dataset_version_id,
+                versions.source_dataset_name,
+                versions.task_type,
+                versions.source_label,
+                versions.record_count,
+                versions.registration_date,
+                versions.last_updated_date,
+                COALESCE(quality.gate_status_numeric, 1) AS gate_status_numeric,
+                COALESCE(quality.records_total, versions.record_count) AS records_total,
+                COALESCE(quality.required_empty_count, 0) AS required_empty_count,
+                COALESCE(quality.duplicate_count, 0) AS duplicate_count,
+                COALESCE(quality.pii_match_count, 0) AS pii_match_count
+            FROM versions
+            LEFT JOIN quality USING (dataset_version_id)
+            ORDER BY TRY_CAST(regexp_extract(versions.dataset_version_id, 'v([0-9]+)$', 1) AS INTEGER), versions.dataset_version_id
+            """,
+            [storage_dataset_id],
+        )
+        versions = [_dataset_summary_from_row(row, self.storage_root) for row in rows]
+        return sorted(versions, key=lambda version: int(version["dataset_version_id"]))
+
+    def get_dataset_version(self, dataset_id: str, dataset_version_id: str) -> dict[str, Any] | None:
+        versions = [
+            version
+            for version in self.list_dataset_versions(dataset_id)
+            if str(version["dataset_version_id"]) == str(dataset_version_id)
+        ]
+        if not versions:
+            return None
+        dataset = versions[0]
         storage_dataset_id = _storage_dataset_id_for_display_id(dataset["dataset_id"])
-        storage_dataset_version_id = _storage_version_id_for_display_id(dataset["dataset_id"], dataset["dataset_version_id"])
+        storage_dataset_version_id = _storage_version_id_for_display_id(
+            dataset["dataset_id"],
+            dataset["dataset_version_id"],
+        )
         quality_metrics = self._get_quality_metrics_by_storage_version(storage_dataset_version_id)
         full_schema_profile = self._get_schema_profile_by_storage_version(storage_dataset_version_id)
-        schema_profile = full_schema_profile[:12]
+        schema_profile = _api_record_schema_profile(
+            storage_schema_profile=full_schema_profile,
+            record_count=int(dataset["record_count"]),
+        )
         return {
             **dataset,
             "quality_metrics": quality_metrics,
@@ -176,7 +264,12 @@ class DatasetRepository:
     ) -> list[dict[str, Any]]:
         _ = dataset_id
         storage_dataset_version_id = _storage_version_id_for_display_id(dataset_id, dataset_version_id)
-        return self._get_schema_profile_by_storage_version(storage_dataset_version_id, limit=limit)
+        storage_schema_profile = self._get_schema_profile_by_storage_version(storage_dataset_version_id)
+        schema_profile = _api_record_schema_profile(
+            storage_schema_profile=storage_schema_profile,
+            record_count=self._record_count_by_storage_version(storage_dataset_version_id),
+        )
+        return schema_profile[:limit] if limit is not None else schema_profile
 
     def _get_schema_profile_by_storage_version(
         self,
@@ -235,8 +328,12 @@ class DatasetRepository:
             {
                 "dataset_id": _dataset_display_id_for_storage_id(row["dataset_id"]),
                 "source_dataset_version_id": "",
-                "target_dataset_version_id": 1,
-                "source_label": "public source",
+                "target_dataset_version_id": _display_version_id_for_storage_version_id(
+                    row["target_dataset_version_id"]
+                ),
+                "source_label": "generated pipeline"
+                if str(row["dataset_id"]).startswith("ds_python_algorithm_study_guides")
+                else "public source",
                 "lineage_event_type": row["lineage_event_type"],
                 "transform_name": row["transform_name"],
                 "transform_config_uri": row["transform_config_uri"],
@@ -245,6 +342,17 @@ class DatasetRepository:
             }
             for row in rows
         ]
+
+    def _record_count_by_storage_version(self, storage_dataset_version_id: str) -> int:
+        rows = self._query(
+            """
+            SELECT COUNT(*) AS record_count
+            FROM dataset_records
+            WHERE dataset_version_id = ?
+            """,
+            [storage_dataset_version_id],
+        )
+        return int(rows[0]["record_count"] or 0) if rows else 0
 
     def _query(self, query: str, params: list[Any] | None = None) -> list[dict[str, Any]]:
         connection = duckdb.connect(str(self.duckdb_path), read_only=True)
@@ -256,6 +364,59 @@ class DatasetRepository:
             connection.close()
 
 
+def _api_record_schema_profile(
+    storage_schema_profile: list[dict[str, Any]],
+    record_count: int,
+) -> list[dict[str, Any]]:
+    rows_by_field = {row["field_name"]: row for row in storage_schema_profile}
+    schema: list[dict[str, Any]] = []
+    for field_name in API_RECORD_FIELDS:
+        row = dict(rows_by_field.get(field_name) or _empty_schema_row(field_name, record_count))
+        if field_name == "record_id":
+            row.update(
+                {
+                    "field_type": "integer",
+                    "non_null_count": record_count,
+                    "null_count": 0,
+                    "empty_count": 0,
+                    "distinct_count": record_count,
+                    "min_length": 1 if record_count else 0,
+                    "max_length": len(str(record_count)) if record_count else 0,
+                    "mean_length": 0.0,
+                }
+            )
+        schema.append({key: row[key] for key in _schema_response_keys()})
+    return schema
+
+
+def _empty_schema_row(field_name: str, record_count: int) -> dict[str, Any]:
+    return {
+        "field_name": field_name,
+        "field_type": "string",
+        "non_null_count": 0,
+        "null_count": record_count,
+        "empty_count": record_count,
+        "distinct_count": 0,
+        "min_length": 0,
+        "max_length": 0,
+        "mean_length": 0.0,
+    }
+
+
+def _schema_response_keys() -> tuple[str, ...]:
+    return (
+        "field_name",
+        "field_type",
+        "non_null_count",
+        "null_count",
+        "empty_count",
+        "distinct_count",
+        "min_length",
+        "max_length",
+        "mean_length",
+    )
+
+
 def _display_name(source_dataset_name: str) -> str:
     return {
         "databricks/databricks-dolly-15k": "Databricks Dolly 15k",
@@ -263,6 +424,9 @@ def _display_name(source_dataset_name: str) -> str:
         "knkarthick/samsum": "SAMSum Dialogue Summarization",
         "allenai/squad": "SQuAD Question Answering",
         "openai/openai_humaneval": "OpenAI HumanEval",
+        "generated/python-algorithm-study-guides/control": "Python Algorithm Study-Guide Control Data",
+        "generated/python-algorithm-study-guides/outline-first": "Python Algorithm Study-Guide Outline-First Data",
+        "generated/python-algorithm-study-guides/failure-corrections": "Python Algorithm Study-Guide Failure-Correction Data",
     }.get(source_dataset_name, source_dataset_name)
 
 
@@ -273,42 +437,84 @@ def _dataset_display_id(source_dataset_name: str) -> int:
         "knkarthick/samsum": 3,
         "allenai/squad": 4,
         "openai/openai_humaneval": 5,
+        "generated/python-algorithm-study-guides/control": 6,
+        "generated/python-algorithm-study-guides/outline-first": 7,
+        "generated/python-algorithm-study-guides/failure-corrections": 8,
     }.get(source_dataset_name, 0)
 
 
 def _dataset_display_id_for_storage_id(dataset_id: str) -> int:
-    return {
+    fixed_id = {
         "ds_databricks_dolly_15k": 1,
         "ds_anthropic_hh_rlhf": 2,
         "ds_samsum": 3,
         "ds_squad": 4,
         "ds_openai_humaneval": 5,
-    }.get(dataset_id, 0)
+        "ds_python_algorithm_study_guides_control": 6,
+        "ds_python_algorithm_study_guides_outline_first": 7,
+        "ds_python_algorithm_study_guides_failure_corrections": 8,
+    }.get(dataset_id)
+    if fixed_id is not None:
+        return fixed_id
+    match = re.fullmatch(r"ds_dataset_(\d+)", dataset_id)
+    return int(match.group(1)) if match else 0
 
 
 def _storage_dataset_id_for_display_id(dataset_id: str | int) -> str:
-    return {
+    fixed_id = {
         "1": "ds_databricks_dolly_15k",
         "2": "ds_anthropic_hh_rlhf",
         "3": "ds_samsum",
         "4": "ds_squad",
         "5": "ds_openai_humaneval",
-    }[str(dataset_id)]
+        "6": "ds_python_algorithm_study_guides_control",
+        "7": "ds_python_algorithm_study_guides_outline_first",
+        "8": "ds_python_algorithm_study_guides_failure_corrections",
+    }.get(str(dataset_id))
+    if fixed_id is not None:
+        return fixed_id
+    return f"ds_dataset_{int(dataset_id)}"
 
 
 def _storage_version_id_for_display_id(dataset_id: str | int, dataset_version_id: str | int) -> str:
+    study_guide_versions = {
+        ("6", "1"): "dsv_python_algorithm_study_guides_control_v1",
+        ("7", "1"): "dsv_python_algorithm_study_guides_outline_first_v1",
+        ("8", "1"): "dsv_python_algorithm_study_guides_failure_corrections_v1",
+    }
+    fixed_study_guide_version = study_guide_versions.get((str(dataset_id), str(dataset_version_id)))
+    if fixed_study_guide_version is not None:
+        return fixed_study_guide_version
     if str(dataset_version_id) != "1":
-        raise KeyError(f"Unknown dataset_version_id {dataset_version_id} for dataset_id {dataset_id}")
-    return {
+        return f"dsv_dataset_{int(dataset_id)}_v{int(dataset_version_id)}"
+    fixed_version = {
         "1": "dsv_databricks_dolly_15k_raw_v1_b66c4cf8e4",
         "2": "dsv_anthropic_hh_rlhf_raw_v1_7b57e8e5e3",
         "3": "dsv_samsum_raw_v1_89e5308a7f",
         "4": "dsv_squad_raw_v1_825c43a962",
         "5": "dsv_openai_humaneval_raw_v1_527d4f2ddd",
-    }[str(dataset_id)]
+    }.get(str(dataset_id))
+    return fixed_version or f"dsv_dataset_{int(dataset_id)}_v1"
+
+
+def _display_version_id_for_storage_version_id(storage_dataset_version_id: str) -> int:
+    fixed_version = {
+        "dsv_python_algorithm_study_guides_control_v1": 1,
+        "dsv_python_algorithm_study_guides_outline_first_v1": 1,
+        "dsv_python_algorithm_study_guides_failure_corrections_v1": 1,
+    }.get(storage_dataset_version_id)
+    if fixed_version is not None:
+        return fixed_version
+    match = re.fullmatch(r"dsv_dataset_\d+_v(\d+)", storage_dataset_version_id)
+    if match:
+        return int(match.group(1))
+    return 1
 
 
 def _source_url(source_dataset_name: str) -> str:
+    if source_dataset_name.startswith("generated/python-algorithm-study-guides"):
+        storage_id = _storage_dataset_id_for_display_id(_dataset_display_id(source_dataset_name))
+        return f"storage/object_store/datasets/{storage_id}"
     return f"https://huggingface.co/datasets/{source_dataset_name}"
 
 
@@ -319,6 +525,7 @@ def _category_for_task(task_type: str) -> str:
         "summarization": "Summarization",
         "question_answering": "Question answering",
         "coding_eval": "Coding eval",
+        "study_guide_generation": "Study-guide generation",
     }.get(task_type, task_type.replace("_", " ").title())
 
 
@@ -329,6 +536,7 @@ def _data_purpose(task_type: str) -> str:
         "summarization": "Summarization training or evaluation data",
         "question_answering": "Question-answering evaluation data",
         "coding_eval": "Coding evaluation benchmark data",
+        "study_guide_generation": "Training data for structured technical study-guide generation",
     }.get(task_type, task_type.replace("_", " ").title())
 
 
@@ -339,6 +547,9 @@ def _description_for_source(source_dataset_name: str) -> str:
         "knkarthick/samsum": "Dialogue-summary pairs for summarization training and evaluation workflows.",
         "allenai/squad": "Context/question/answer records for QA evaluation and optional training workflows.",
         "openai/openai_humaneval": "Python coding benchmark tasks for model evaluation and checkpoint comparison workflows.",
+        "generated/python-algorithm-study-guides/control": "Baseline study-guide examples for the control arm of the Python algorithm study-material experiment.",
+        "generated/python-algorithm-study-guides/outline-first": "Outline-first study-guide examples for the first test arm of the Python algorithm study-material experiment.",
+        "generated/python-algorithm-study-guides/failure-corrections": "Failure-correction study-guide examples for the second test arm of the Python algorithm study-material experiment.",
     }.get(source_dataset_name, "Versioned public dataset normalized into the shared research-data schema.")
 
 
@@ -346,7 +557,17 @@ def _quality_status(gate_status_numeric: float | int | None) -> str:
     return "ready" if gate_status_numeric == 0 else "review"
 
 
-def _dataset_summary_from_row(row: dict[str, Any]) -> dict[str, Any]:
+def _dataset_summary_from_row(row: dict[str, Any], storage_root: Path) -> dict[str, Any]:
+    manifest = _read_dataset_manifest(
+        storage_root=storage_root,
+        storage_dataset_id=row["dataset_id"],
+        storage_dataset_version_id=row["dataset_version_id"],
+    )
+    dataset_id = int(manifest.get("public_dataset_id") or _dataset_display_id_for_storage_id(row["dataset_id"]))
+    dataset_version_id = int(
+        manifest.get("public_dataset_version_id")
+        or _display_version_id_for_storage_version_id(row["dataset_version_id"])
+    )
     quality_score = _quality_score_from_values(
         records_total=float(row["records_total"] or row["record_count"] or 0),
         required_empty_count=float(row["required_empty_count"] or 0),
@@ -355,16 +576,16 @@ def _dataset_summary_from_row(row: dict[str, Any]) -> dict[str, Any]:
         profile_available=True,
     )
     return {
-        "dataset_id": _dataset_display_id(row["source_dataset_name"]),
-        "dataset_version_id": 1,
-        "name": _display_name(row["source_dataset_name"]),
-        "source_url": _source_url(row["source_dataset_name"]),
+        "dataset_id": dataset_id or _dataset_display_id(row["source_dataset_name"]),
+        "dataset_version_id": dataset_version_id,
+        "name": manifest.get("display_name") or _display_name(row["source_dataset_name"]),
+        "source_url": manifest.get("source_url") or _source_url(row["source_dataset_name"]),
         "source_dataset_name": row["source_dataset_name"],
         "task_type": row["task_type"],
-        "data_purpose": _data_purpose(row["task_type"]),
-        "data_format": "Parquet",
-        "query_engine": "DuckDB",
-        "description": _description_for_source(row["source_dataset_name"]),
+        "data_purpose": manifest.get("data_purpose") or _data_purpose(row["task_type"]),
+        "data_format": manifest.get("data_format") or "Parquet",
+        "query_engine": manifest.get("query_engine") or "DuckDB",
+        "description": manifest.get("description") or _description_for_source(row["source_dataset_name"]),
         "source_label": row["source_label"],
         "record_count": row["record_count"],
         "registration_date": row["registration_date"],
@@ -374,8 +595,19 @@ def _dataset_summary_from_row(row: dict[str, Any]) -> dict[str, Any]:
         "quality_status": _quality_status(row["gate_status_numeric"]),
         "quality_score": quality_score,
         "quality_label": _quality_label(quality_score),
-        "category": _category_for_task(row["task_type"]),
+        "category": manifest.get("category") or _category_for_task(row["task_type"]),
     }
+
+
+def _read_dataset_manifest(
+    storage_root: Path,
+    storage_dataset_id: str,
+    storage_dataset_version_id: str,
+) -> dict[str, Any]:
+    path = storage_root / "object_store" / "datasets" / storage_dataset_id / "versions" / storage_dataset_version_id / "manifest.json"
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _quality_summary(
@@ -517,4 +749,5 @@ def _required_fields_for_task(task_type: str) -> list[str]:
         "summarization": ["input_text", "target_text"],
         "question_answering": ["context", "question", "target_text"],
         "coding_eval": ["input_text", "target_text"],
+        "study_guide_generation": ["input_text", "target_text"],
     }.get(task_type, ["input_text", "target_text"])

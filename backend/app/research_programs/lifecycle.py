@@ -18,11 +18,11 @@ JSON_LIST_FIELDS = {
     "linked_datasets",
     "linked_experiment_ids",
     "linked_run_ids",
+    "notes",
 }
 
 STRING_FIELDS = {
     "program_name",
-    "short_name",
     "program_description",
     "problem_statement",
     "initiating_context",
@@ -33,7 +33,6 @@ STRING_FIELDS = {
     "research_area",
     "current_focus",
     "owner_name",
-    "decision_notes",
     "input_source",
     "created_by_user_id",
     "updated_by_user_id",
@@ -47,6 +46,14 @@ class RegisteredResearchProgram:
     status: str
     researcher_names: list[str]
     created_at: str
+    updated_at: str
+
+
+@dataclass(frozen=True)
+class ResearchProgramNoteResult:
+    program_id: int
+    note_id: int
+    notes: list[dict[str, Any]]
     updated_at: str
 
 
@@ -133,6 +140,90 @@ def update_research_program(
     return updated
 
 
+def append_research_program_note(
+    storage_root: Path,
+    program_id: int,
+    payload: dict[str, Any],
+) -> ResearchProgramNoteResult:
+    path = _program_path(storage_root, program_id)
+    frame = _read_parquet_if_exists(path)
+    if frame.empty:
+        raise ValueError(f"program_id {program_id} does not exist")
+    current = frame.iloc[0].to_dict()
+    body = str(payload.get("body") or payload.get("note") or "").strip()
+    if not body:
+        raise ValueError("note body is required")
+
+    notes = _note_list(current)
+    note_id = int(payload.get("note_id") or _next_note_id(notes))
+    note = {
+        "note_id": note_id,
+        "body": body,
+        "author_name": str(
+            payload.get("author_name")
+            or payload.get("created_by_user_id")
+            or current.get("updated_by_user_id")
+            or current.get("owner_name")
+            or "user_demo_owner"
+        ),
+        "created_at": str(payload.get("created_at") or _utc_now()),
+    }
+    notes.append(note)
+    updated = update_research_program(
+        storage_root=storage_root,
+        program_id=program_id,
+        payload={
+            "notes": notes,
+            "updated_by_user_id": note["author_name"],
+            "updated_at": payload.get("updated_at") or note["created_at"],
+        },
+    )
+    return ResearchProgramNoteResult(
+        program_id=program_id,
+        note_id=note_id,
+        notes=json.loads(updated["notes_json"]),
+        updated_at=updated["updated_at"],
+    )
+
+
+def delete_research_program_note(
+    storage_root: Path,
+    program_id: int,
+    note_id: int,
+    payload: dict[str, Any] | None = None,
+) -> ResearchProgramNoteResult:
+    payload = payload or {}
+    path = _program_path(storage_root, program_id)
+    frame = _read_parquet_if_exists(path)
+    if frame.empty:
+        raise ValueError(f"program_id {program_id} does not exist")
+    current = frame.iloc[0].to_dict()
+    notes = _note_list(current)
+    remaining_notes = [note for note in notes if int(note["note_id"]) != int(note_id)]
+    if len(remaining_notes) == len(notes):
+        raise ValueError(f"note_id {note_id} does not exist for program_id {program_id}")
+
+    updated_at = str(payload.get("updated_at") or _utc_now())
+    updated = update_research_program(
+        storage_root=storage_root,
+        program_id=program_id,
+        payload={
+            "notes": remaining_notes,
+            "updated_by_user_id": payload.get("updated_by_user_id")
+            or payload.get("user_id")
+            or current.get("updated_by_user_id")
+            or "user_demo_owner",
+            "updated_at": updated_at,
+        },
+    )
+    return ResearchProgramNoteResult(
+        program_id=program_id,
+        note_id=note_id,
+        notes=json.loads(updated["notes_json"]),
+        updated_at=updated["updated_at"],
+    )
+
+
 def register_research_program_duckdb_view(
     storage_root: Path,
     duckdb_path: Path,
@@ -178,7 +269,6 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "program_id": int(payload["program_id"]),
         "program_name": program_name,
-        "short_name": str(payload.get("short_name") or program_name).strip(),
         "program_description": str(payload.get("program_description") or "").strip(),
         "problem_statement": str(payload.get("problem_statement") or "").strip(),
         "initiating_context": _text_value(payload, "initiating_context", "origin_story"),
@@ -194,7 +284,7 @@ def _normalize_program_row(payload: dict[str, Any]) -> dict[str, Any]:
         "linked_datasets_json": json.dumps(linked_datasets, sort_keys=True),
         "linked_experiment_ids_json": json.dumps(linked_experiment_ids, sort_keys=True),
         "linked_run_ids_json": json.dumps(linked_run_ids, sort_keys=True),
-        "decision_notes": str(payload.get("decision_notes") or "").strip(),
+        "notes_json": json.dumps(_note_list(payload), sort_keys=True),
         "input_source": str(payload.get("input_source") or "ui").strip(),
         "created_at": str(payload["created_at"]),
         "updated_at": str(payload["updated_at"]),
@@ -209,6 +299,52 @@ def _string_list(payload: dict[str, Any], key: str) -> list[str]:
 
 def _text_value(payload: dict[str, Any], key: str, legacy_key: str) -> str:
     return str(payload.get(key) or payload.get(legacy_key) or "").strip()
+
+
+def _note_list(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    notes = _list_value(payload, "notes")
+    if not notes and str(payload.get("decision_notes") or "").strip():
+        notes = [
+            {
+                "body": str(payload.get("decision_notes") or "").strip(),
+                "author_name": payload.get("updated_by_user_id")
+                or payload.get("created_by_user_id")
+                or payload.get("owner_name")
+                or "user_demo_owner",
+                "created_at": payload.get("updated_at") or payload.get("created_at") or _utc_now(),
+            }
+        ]
+    normalized: list[dict[str, Any]] = []
+    for index, note in enumerate(notes, start=1):
+        if isinstance(note, str):
+            body = note.strip()
+            author_name = str(payload.get("updated_by_user_id") or "user_demo_owner")
+            created_at = str(payload.get("updated_at") or _utc_now())
+            note_id = index
+        elif isinstance(note, dict):
+            body = str(note.get("body") or note.get("note") or "").strip()
+            author_name = str(note.get("author_name") or note.get("created_by_user_id") or "")
+            created_at = str(note.get("created_at") or "")
+            note_id = int(note.get("note_id") or index)
+        else:
+            raise ValueError("notes must be strings or objects")
+        if not body:
+            continue
+        normalized.append(
+            {
+                "note_id": note_id,
+                "body": body,
+                "author_name": author_name or "user_demo_owner",
+                "created_at": created_at or _utc_now(),
+            }
+        )
+    return normalized
+
+
+def _next_note_id(notes: list[dict[str, Any]]) -> int:
+    if not notes:
+        return 1
+    return max(int(note["note_id"]) for note in notes) + 1
 
 
 def attach_research_program_links(

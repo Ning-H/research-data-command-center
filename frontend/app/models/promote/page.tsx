@@ -22,7 +22,7 @@ export default function PromoteCheckpointPage({ searchParams = {} }: PromotePage
             lineage from `checkpoint_id`.
           </p>
         </div>
-        <Link className="button secondary" href="/runs/checkpoints">
+        <Link className="btn btn--secondary" href="/runs/checkpoints">
           <ArrowLeft aria-hidden="true" size={16} />
           Checkpoints
         </Link>
@@ -79,7 +79,7 @@ export default function PromoteCheckpointPage({ searchParams = {} }: PromotePage
         </label>
 
         <div className="action-row">
-          <button className="button" type="submit">
+          <button className="btn btn--primary" type="submit">
             Register model version
           </button>
         </div>

@@ -73,7 +73,7 @@ export default async function DatasetsPage() {
                 </td>
                 <td>{dataset.source_label}</td>
                 <td>
-                  <Link className="button secondary" href={`/datasets/${dataset.dataset_id}`}>
+                  <Link className="btn btn--secondary" href={`/datasets/${dataset.dataset_id}`}>
                     <Database aria-hidden="true" size={16} />
                     Detail
                     <ArrowRight aria-hidden="true" size={16} />

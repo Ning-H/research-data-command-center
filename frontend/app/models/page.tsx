@@ -21,7 +21,7 @@ export default async function ModelsPage() {
             the checkpoint, training run, data asset, and artifact lineage needed for later evaluation.
           </p>
         </div>
-        <Link className="button secondary" href="/runs/checkpoints">
+        <Link className="btn btn--secondary" href="/runs/checkpoints">
           Find checkpoints
           <ArrowRight aria-hidden="true" size={16} />
         </Link>
@@ -109,7 +109,7 @@ export default async function ModelsPage() {
                 </td>
                 <td>{model.intended_use || "not provided"}</td>
                 <td>
-                  <Link className="button secondary" href={`/models/${model.model_version_id}`}>
+                  <Link className="btn btn--secondary" href={`/models/${model.model_version_id}`}>
                     Detail
                     <ArrowRight aria-hidden="true" size={16} />
                   </Link>

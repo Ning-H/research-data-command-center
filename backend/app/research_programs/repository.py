@@ -9,6 +9,27 @@ import duckdb
 from app.research_programs.lifecycle import register_research_program_duckdb_view
 
 
+PROGRAM_RESPONSE_FIELDS = {
+    "program_id",
+    "program_name",
+    "program_description",
+    "problem_statement",
+    "initiating_context",
+    "research_goal",
+    "hypothesis",
+    "research_objectives",
+    "status",
+    "research_area",
+    "current_focus",
+    "owner_name",
+    "input_source",
+    "created_at",
+    "updated_at",
+    "created_by_user_id",
+    "updated_by_user_id",
+}
+
+
 class ResearchProgramRepository:
     def __init__(self, duckdb_path: Path, storage_root: Path) -> None:
         self.duckdb_path = duckdb_path
@@ -44,11 +65,15 @@ class ResearchProgramRepository:
         )
         programs = [_program_row(row) for row in rows]
         if researcher_name:
+            normalized_researcher = researcher_name.lower()
             programs = [
                 program
                 for program in programs
-                if researcher_name in program.get("researcher_names", [])
-                or researcher_name == program.get("owner_name")
+                if normalized_researcher in str(program.get("owner_name", "")).lower()
+                or any(
+                    normalized_researcher in str(name).lower()
+                    for name in program.get("researcher_names", [])
+                )
             ]
         if tag:
             normalized_tag = tag.lower()
@@ -84,7 +109,8 @@ class ResearchProgramRepository:
                     "attach_data_assets",
                     "attach_experiments",
                     "attach_training_runs",
-                    "append_decision_notes",
+                    "append_note",
+                    "delete_note",
                 ],
             },
         }
@@ -109,7 +135,11 @@ class ResearchProgramRepository:
 
 
 def _program_row(row: dict[str, Any]) -> dict[str, Any]:
-    program = {key: value for key, value in row.items() if not key.endswith("_json")}
+    program = {
+        key: value
+        for key, value in row.items()
+        if key in PROGRAM_RESPONSE_FIELDS and not key.endswith("_json")
+    }
     return {
         **program,
         "researcher_names": _json_list(row.get("researcher_names_json")),
@@ -117,6 +147,7 @@ def _program_row(row: dict[str, Any]) -> dict[str, Any]:
         "linked_datasets": _json_list(row.get("linked_datasets_json")),
         "linked_experiment_ids": _json_list(row.get("linked_experiment_ids_json")),
         "linked_run_ids": _json_list(row.get("linked_run_ids_json")),
+        "notes": _program_notes(row),
     }
 
 
@@ -131,7 +162,6 @@ def _json_list(value: Any) -> list[Any]:
 def _program_search_text(program: dict[str, Any]) -> str:
     values = [
         program.get("program_name"),
-        program.get("short_name"),
         program.get("program_description"),
         program.get("problem_statement"),
         program.get("initiating_context"),
@@ -140,7 +170,29 @@ def _program_search_text(program: dict[str, Any]) -> str:
         program.get("research_objectives"),
         program.get("research_area"),
         program.get("current_focus"),
-        program.get("decision_notes"),
+        " ".join(str(note.get("body", "")) for note in program.get("notes", [])),
         " ".join(str(tag) for tag in program.get("tags", [])),
     ]
     return " ".join(str(value or "").lower() for value in values)
+
+
+def _program_notes(row: dict[str, Any]) -> list[dict[str, Any]]:
+    notes = _json_list(row.get("notes_json"))
+    if notes:
+        return notes
+    legacy_note = str(row.get("decision_notes") or "").strip()
+    if not legacy_note:
+        return []
+    return [
+        {
+            "note_id": 1,
+            "body": legacy_note,
+            "author_name": str(
+                row.get("updated_by_user_id")
+                or row.get("created_by_user_id")
+                or row.get("owner_name")
+                or "user_demo_owner"
+            ),
+            "created_at": str(row.get("updated_at") or row.get("created_at") or ""),
+        }
+    ]

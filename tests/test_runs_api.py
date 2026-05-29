@@ -33,6 +33,8 @@ def test_runs_api_exposes_researcher_submitted_run_data(tmp_path: Path) -> None:
         detail_response = client.get("/runs/1")
         assert detail_response.status_code == 200
         detail = detail_response.json()
+        assert detail["program_id"] == 1
+        assert detail["experiment_id"] == 1
         assert detail["dataset_id"] == 1
         assert detail["dataset_version_id"] == 1
         assert detail["raw_ingest_summary"]["source_priority"] == "SYNTHETIC_REALISTIC"
@@ -186,6 +188,8 @@ def test_run_registration_append_and_completion_flow(tmp_path: Path) -> None:
         assert complete_response.status_code == 200
 
         detail = client.get(f"/runs/{run_id}").json()
+        assert detail["program_id"] == 1
+        assert detail["experiment_id"] == 1
         assert detail["source_priority"] == "GENERATED_REAL"
         assert detail["metric_summary"]["final_loss"] == 1.2
         assert detail["compute_summary"]["avg_process_memory_mb"] == 120.0

@@ -95,7 +95,14 @@ def write_dataset_outputs(
     duplicates_path = _single_table_path(storage_root, definition.dataset_id, "dataset_duplicate_reports", dataset_version_id, "duplicates.parquet")
     pii_path = _single_table_path(storage_root, definition.dataset_id, "dataset_pii_scan_results", dataset_version_id, "pii.parquet")
     tokens_path = _single_table_path(storage_root, definition.dataset_id, "dataset_token_statistics", dataset_version_id, "tokens.parquet")
-    lineage_path = storage_root / "parquet" / "dataset_lineage" / f"dataset_id={definition.dataset_id}" / "lineage.parquet"
+    lineage_path = (
+        storage_root
+        / "parquet"
+        / "dataset_lineage"
+        / f"dataset_id={definition.dataset_id}"
+        / f"dataset_version_id={dataset_version_id}"
+        / "lineage.parquet"
+    )
 
     _write_parquet(normalized_records, records_path)
     _write_parquet(build_schema_profile(normalized_records, dataset_version_id, created_at), profile_path)
@@ -277,13 +284,18 @@ def build_dataset_version_metadata(
     raw_uri: str,
     parquet_uri: str,
 ) -> dict[str, Any]:
+    source_priority = SourcePriority.PUBLIC_REAL.value
+    if definition.source_dataset_name.startswith("generated/python-algorithm-study-guides"):
+        source_priority = SourcePriority.SYNTHETIC_REALISTIC.value
+    elif definition.source_dataset_name.startswith("generated/"):
+        source_priority = SourcePriority.GENERATED_REAL.value
     return {
         "dataset_id": definition.dataset_id,
         "dataset_version_id": dataset_version_id,
         "name": f"{definition.display_name} {DEFAULT_VERSION}",
         "version": DEFAULT_VERSION,
         "status": "published",
-        "source_priority": SourcePriority.PUBLIC_REAL.value,
+        "source_priority": source_priority,
         "raw_uri": raw_uri,
         "parquet_uri": parquet_uri,
         "schema_uri": f"storage/object_store/datasets/{definition.dataset_id}/versions/{dataset_version_id}/source_schema.json",
@@ -308,10 +320,11 @@ def register_duckdb_views(storage_root: Path, duckdb_path: Path) -> None:
         }
         for view_name, pattern in view_patterns.items():
             escaped_pattern = str(pattern).replace("'", "''")
+            hive_partitioning = "false" if view_name == "dataset_lineage" else "true"
             connection.execute(
                 f"""
                 CREATE OR REPLACE VIEW {view_name} AS
-                SELECT * FROM read_parquet('{escaped_pattern}', hive_partitioning = true, union_by_name = true)
+                SELECT * FROM read_parquet('{escaped_pattern}', hive_partitioning = {hive_partitioning}, union_by_name = true)
                 """
             )
     finally:

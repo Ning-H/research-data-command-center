@@ -37,7 +37,7 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
             and lineage. Training and checkpoint file creation happened outside this platform.
           </p>
         </div>
-        <Link className="button secondary" href="/training-runs">
+        <Link className="btn btn--secondary" href="/training-runs">
           <ArrowLeft aria-hidden="true" size={16} />
           Training Runs
         </Link>
@@ -141,7 +141,7 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
               Checkpoint files were saved by the training job; this platform stores their URI,
               step, metrics snapshot, and promotion-ready lineage.
             </p>
-            <Link className="button secondary" href={checkpointSearchHref}>
+            <Link className="btn btn--secondary" href={checkpointSearchHref}>
               Compare same dataset / trainer
               <ArrowRight aria-hidden="true" size={16} />
             </Link>

@@ -5,7 +5,6 @@ import {
   BrainCircuit,
   ClipboardCheck,
   Database,
-  FileText,
   FlaskConical,
   Home,
   LineChart,
@@ -47,8 +46,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <div className="app-shell">
           <aside className="sidebar">
             <Link className="brand" href="/">
-              <FileText aria-hidden="true" size={22} />
-              <span>Research Data Command Center</span>
+              <span className="brand-mark" aria-hidden="true">
+                <span className="brand-node brand-node-primary" />
+                <span className="brand-node brand-node-mid" />
+                <span className="brand-node brand-node-end" />
+              </span>
+              <span className="brand-copy">
+                <span>Research Data</span>
+                <span>Command Center</span>
+              </span>
             </Link>
             <nav className="nav-list" aria-label="Main navigation">
               {navItems.map((item) => {
@@ -61,8 +67,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 );
               })}
             </nav>
+            <div className="site-signature">Built by Ning Han</div>
           </aside>
-          <main className="main">{children}</main>
+          <main className="main">
+            {children}
+          </main>
         </div>
       </body>
     </html>
