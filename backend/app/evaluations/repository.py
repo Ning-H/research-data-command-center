@@ -657,7 +657,7 @@ class EvaluationRepository:
         }
 
     def _run_row(self, row: dict[str, Any]) -> dict[str, Any]:
-        return dict(row)
+        return _run_row_static(row)
 
     def _output_row(self, row: dict[str, Any]) -> dict[str, Any]:
         return {
@@ -762,6 +762,13 @@ def _run_row_static(row: dict[str, Any]) -> dict[str, Any]:
         "started_at": row["started_at"],
         "ended_at": row["ended_at"],
         "created_by_user_id": row["created_by_user_id"],
+        "evaluator_name": row.get("evaluator_name") or "",
+        "evaluator_version": row.get("evaluator_version") or "",
+        "eval_job_uri": row.get("eval_job_uri") or "",
+        "external_eval_run_id": row.get("external_eval_run_id") or "",
+        "git_commit": row.get("git_commit") or "",
+        "environment": _json_object(row.get("environment_json")),
+        "notes": row.get("notes") or "",
     }
 
 
@@ -783,6 +790,10 @@ def _failure_row(row: dict[str, Any]) -> dict[str, Any]:
         "failure_reason": row["failure_reason"],
         "evidence_text": row.get("evidence_text", ""),
         "status": row["status"],
+        "root_cause": row.get("root_cause", ""),
+        "review_notes": row.get("review_notes", ""),
+        "reviewed_at": row.get("reviewed_at", ""),
+        "reviewed_by_user_id": row.get("reviewed_by_user_id", ""),
         "created_at": row["created_at"],
         "case_name": row.get("case_name"),
         "prompt_text": row.get("prompt_text"),

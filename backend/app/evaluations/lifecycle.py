@@ -30,6 +30,16 @@ class RegisteredEvalRun:
     status: str
 
 
+FAILURE_REVIEW_STATUSES = {
+    "open",
+    "in_review",
+    "valid_failure",
+    "candidate_created",
+    "resolved",
+    "dismissed",
+}
+
+
 def register_eval_suite(storage_root: Path, payload: dict[str, Any]) -> RegisteredEvalSuite:
     duckdb_path = storage_root / "duckdb" / "research_command_center.duckdb"
     register_evaluation_duckdb_views(storage_root=storage_root, duckdb_path=duckdb_path)
@@ -100,6 +110,21 @@ def register_eval_run(storage_root: Path, payload: dict[str, Any]) -> Registered
     model_version_id = int(payload["model_version_id"])
     duckdb_path = storage_root / "duckdb" / "research_command_center.duckdb"
     register_evaluation_duckdb_views(storage_root=storage_root, duckdb_path=duckdb_path)
+    external_eval_run_id = str(payload.get("external_eval_run_id") or "").strip()
+    if external_eval_run_id:
+        existing = _eval_run_for_external_id(
+            duckdb_path=duckdb_path,
+            external_eval_run_id=external_eval_run_id,
+        )
+        if existing is not None:
+            return RegisteredEvalRun(
+                eval_run_id=int(existing["eval_run_id"]),
+                eval_suite_id=int(existing["eval_suite_id"]),
+                model_version_id=int(existing["model_version_id"]),
+                output_count=int(existing.get("output_count") or 0),
+                failure_count=int(existing.get("failure_count") or 0),
+                status=str(existing["status"]),
+            )
     model = _model_context(duckdb_path=duckdb_path, model_version_id=model_version_id)
     if model is None:
         raise ValueError(f"model_version_id {model_version_id} does not exist")
@@ -129,6 +154,13 @@ def register_eval_run(storage_root: Path, payload: dict[str, Any]) -> Registered
         "started_at": started_at,
         "ended_at": ended_at,
         "created_by_user_id": str(payload.get("created_by_user_id") or "user_demo_owner"),
+        "evaluator_name": str(payload.get("evaluator_name") or ""),
+        "evaluator_version": str(payload.get("evaluator_version") or ""),
+        "eval_job_uri": str(payload.get("eval_job_uri") or ""),
+        "external_eval_run_id": external_eval_run_id,
+        "git_commit": str(payload.get("git_commit") or ""),
+        "environment_json": json.dumps(payload.get("environment") or {}, sort_keys=True),
+        "notes": str(payload.get("notes") or ""),
     }
 
     output_rows: list[dict[str, Any]] = []
@@ -186,6 +218,10 @@ def register_eval_run(storage_root: Path, payload: dict[str, Any]) -> Registered
                     "failure_reason": str(failure.get("failure_reason") or ""),
                     "evidence_text": str(failure.get("evidence_text") or ""),
                     "status": str(failure.get("status") or "open"),
+                    "root_cause": str(failure.get("root_cause") or ""),
+                    "review_notes": str(failure.get("review_notes") or ""),
+                    "reviewed_at": str(failure.get("reviewed_at") or ""),
+                    "reviewed_by_user_id": str(failure.get("reviewed_by_user_id") or ""),
                     "created_at": str(failure.get("created_at") or ended_at),
                 }
             )
@@ -208,6 +244,63 @@ def register_eval_run(storage_root: Path, payload: dict[str, Any]) -> Registered
         failure_count=len(failure_rows),
         status=status,
     )
+
+
+def update_eval_failure_review(
+    storage_root: Path,
+    eval_failure_id: int,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    duckdb_path = storage_root / "duckdb" / "research_command_center.duckdb"
+    register_evaluation_duckdb_views(storage_root=storage_root, duckdb_path=duckdb_path)
+    existing = _eval_failure_context(duckdb_path=duckdb_path, eval_failure_id=eval_failure_id)
+    if existing is None:
+        raise ValueError(f"eval_failure_id {eval_failure_id} does not exist")
+
+    eval_run_id = int(existing["eval_run_id"])
+    path = _eval_failures_path(storage_root, eval_run_id)
+    if not path.exists():
+        raise ValueError(f"eval_failure_id {eval_failure_id} does not have a failure artifact")
+
+    df = pd.read_parquet(path)
+    mask = df["eval_failure_id"].astype(int) == int(eval_failure_id)
+    if not bool(mask.any()):
+        raise ValueError(f"eval_failure_id {eval_failure_id} does not exist")
+
+    row = _failure_row_with_review_defaults(df.loc[mask].iloc[0].to_dict())
+    changed = False
+    if "status" in payload:
+        status = str(payload["status"] or "").strip()
+        if status not in FAILURE_REVIEW_STATUSES:
+            raise ValueError(f"status must be one of: {', '.join(sorted(FAILURE_REVIEW_STATUSES))}")
+        row["status"] = status
+        changed = True
+    if "root_cause" in payload:
+        row["root_cause"] = str(payload.get("root_cause") or "").strip()
+        changed = True
+    if "review_notes" in payload:
+        row["review_notes"] = str(payload.get("review_notes") or "").strip()
+        changed = True
+    if "notes" in payload:
+        row["review_notes"] = str(payload.get("notes") or "").strip()
+        changed = True
+
+    reviewed_by = payload.get("reviewed_by_user_id") or payload.get("reviewer_name") or payload.get("user_id")
+    if reviewed_by:
+        row["reviewed_by_user_id"] = str(reviewed_by)
+        changed = True
+    if changed:
+        row["reviewed_at"] = str(payload.get("reviewed_at") or _utc_now())
+
+    for key, value in row.items():
+        if key not in df.columns:
+            df[key] = _empty_value_for(value)
+        df.loc[mask, key] = value
+
+    _write_parquet(df.to_dict(orient="records"), path)
+    _sync_eval_run_manifest_failure(storage_root=storage_root, eval_run_id=eval_run_id, updated_failure=row)
+    register_evaluation_duckdb_views(storage_root=storage_root, duckdb_path=duckdb_path)
+    return row
 
 
 def register_evaluation_duckdb_views(storage_root: Path, duckdb_path: Path) -> None:
@@ -259,6 +352,70 @@ def _model_context(duckdb_path: Path, model_version_id: int) -> dict[str, Any] |
         connection.close()
 
 
+def _eval_run_for_external_id(
+    duckdb_path: Path,
+    external_eval_run_id: str,
+) -> dict[str, Any] | None:
+    if not duckdb_path.exists():
+        return None
+    connection = duckdb.connect(str(duckdb_path), read_only=True)
+    try:
+        try:
+            result = connection.execute(
+                """
+                SELECT *
+                FROM eval_runs
+                WHERE external_eval_run_id = ?
+                ORDER BY eval_run_id DESC
+                LIMIT 1
+                """,
+                [external_eval_run_id],
+            )
+        except duckdb.Error:
+            return None
+        row = result.fetchone()
+        if row is None:
+            return None
+        columns = [column[0] for column in result.description]
+        existing = dict(zip(columns, row, strict=True))
+        eval_run_id = int(existing["eval_run_id"])
+        existing["output_count"] = _count_rows_for_eval_run(
+            duckdb_path=duckdb_path,
+            table_name="eval_outputs",
+            count_column="eval_output_id",
+            eval_run_id=eval_run_id,
+        )
+        existing["failure_count"] = _count_rows_for_eval_run(
+            duckdb_path=duckdb_path,
+            table_name="eval_failures",
+            count_column="eval_failure_id",
+            eval_run_id=eval_run_id,
+        )
+        return existing
+    finally:
+        connection.close()
+
+
+def _count_rows_for_eval_run(
+    duckdb_path: Path,
+    table_name: str,
+    count_column: str,
+    eval_run_id: int,
+) -> int:
+    connection = duckdb.connect(str(duckdb_path), read_only=True)
+    try:
+        try:
+            value = connection.execute(
+                f"SELECT COUNT({count_column}) FROM {table_name} WHERE eval_run_id = ?",
+                [eval_run_id],
+            ).fetchone()[0]
+        except duckdb.Error:
+            value = 0
+        return int(value or 0)
+    finally:
+        connection.close()
+
+
 def _suite_exists(duckdb_path: Path, eval_suite_id: int) -> bool:
     if not duckdb_path.exists():
         return False
@@ -272,6 +429,27 @@ def _suite_exists(duckdb_path: Path, eval_suite_id: int) -> bool:
         except duckdb.Error:
             return False
         return row is not None
+    finally:
+        connection.close()
+
+
+def _eval_failure_context(duckdb_path: Path, eval_failure_id: int) -> dict[str, Any] | None:
+    if not duckdb_path.exists():
+        return None
+    connection = duckdb.connect(str(duckdb_path), read_only=True)
+    try:
+        try:
+            result = connection.execute(
+                "SELECT * FROM eval_failures WHERE eval_failure_id = ? LIMIT 1",
+                [int(eval_failure_id)],
+            )
+        except duckdb.Error:
+            return None
+        row = result.fetchone()
+        if row is None:
+            return None
+        columns = [column[0] for column in result.description]
+        return dict(zip(columns, row, strict=True))
     finally:
         connection.close()
 
@@ -319,6 +497,79 @@ def _write_parquet(rows: list[dict[str, Any]], path: Path) -> None:
 def _write_json(payload: dict[str, Any], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _sync_eval_run_manifest_failure(
+    storage_root: Path,
+    eval_run_id: int,
+    updated_failure: dict[str, Any],
+) -> None:
+    path = storage_root / "object_store" / "eval_runs" / f"eval_run_id={eval_run_id}" / "eval_run_manifest.json"
+    if not path.exists():
+        return
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    failures = list(manifest.get("failures") or [])
+    for index, failure in enumerate(failures):
+        if int(failure.get("eval_failure_id") or 0) == int(updated_failure["eval_failure_id"]):
+            failures[index] = {**failure, **updated_failure}
+            break
+    manifest["failures"] = failures
+    _write_json(manifest, path)
+
+
+def _failure_row_with_review_defaults(row: dict[str, Any]) -> dict[str, Any]:
+    defaults: dict[str, Any] = {
+        "root_cause": "",
+        "review_notes": "",
+        "reviewed_at": "",
+        "reviewed_by_user_id": "",
+    }
+    hydrated = {**defaults, **row}
+    int_fields = (
+        "eval_failure_id",
+        "eval_run_id",
+        "eval_output_id",
+        "eval_case_id",
+        "model_version_id",
+        "dataset_id",
+        "dataset_version_id",
+    )
+    for key in int_fields:
+        hydrated[key] = int(_scalar_or_default(hydrated.get(key), 0) or 0)
+    text_fields = (
+        "failure_type",
+        "severity",
+        "failure_reason",
+        "evidence_text",
+        "status",
+        "root_cause",
+        "review_notes",
+        "reviewed_at",
+        "reviewed_by_user_id",
+        "created_at",
+    )
+    for key in text_fields:
+        hydrated[key] = str(_scalar_or_default(hydrated.get(key), "") or "")
+    return hydrated
+
+
+def _scalar_or_default(value: Any, default: Any) -> Any:
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except (TypeError, ValueError):
+        return value
+    return value
+
+
+def _empty_value_for(value: Any) -> Any:
+    if isinstance(value, int):
+        return 0
+    if isinstance(value, float):
+        return 0.0
+    return ""
 
 
 def _utc_now() -> str:

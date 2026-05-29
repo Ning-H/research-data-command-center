@@ -172,40 +172,52 @@ def test_eval_run_failures_can_be_saved_as_dataset_candidates(tmp_path: Path) ->
         assert suite_response.status_code == 200
         eval_suite_id = suite_response.json()["eval_suite_id"]
 
-        eval_response = client.post(
-            "/eval-runs",
-            json={
-                "eval_suite_id": eval_suite_id,
-                "model_version_id": model_version_id,
-                "outputs": [
-                    {
-                        "eval_case_id": 1,
-                        "prompt_text": "Explain binary search.",
-                        "output_text": "Binary search is fast but this answer is too shallow.",
-                        "scores": {
-                            "coverage": 1.0,
-                            "depth": 0.2,
-                            "examples": 0.0,
-                            "accuracy": 0.5,
-                            "learning_flow": 0.0,
-                            "overall": 0.34,
-                        },
-                        "failures": [
-                            {
-                                "failure_type": "shallow_explanation",
-                                "severity": "high",
-                                "failure_reason": "Missing depth and examples.",
-                            }
-                        ],
-                    }
-                ],
-            },
-        )
+        eval_payload = {
+            "eval_suite_id": eval_suite_id,
+            "model_version_id": model_version_id,
+            "evaluator_name": "pytest_eval_pipeline",
+            "evaluator_version": "v1",
+            "eval_job_uri": "tests/test_evaluations_api.py",
+            "external_eval_run_id": "pytest-eval-run-001",
+            "git_commit": "test-git-sha",
+            "environment": {"runtime": "pytest"},
+            "notes": "Exercise SDK-oriented eval metadata and idempotency.",
+            "outputs": [
+                {
+                    "eval_case_id": 1,
+                    "prompt_text": "Explain binary search.",
+                    "output_text": "Binary search is fast but this answer is too shallow.",
+                    "scores": {
+                        "coverage": 1.0,
+                        "depth": 0.2,
+                        "examples": 0.0,
+                        "accuracy": 0.5,
+                        "learning_flow": 0.0,
+                        "overall": 0.34,
+                    },
+                    "failures": [
+                        {
+                            "failure_type": "shallow_explanation",
+                            "severity": "high",
+                            "failure_reason": "Missing depth and examples.",
+                        }
+                    ],
+                }
+            ],
+        }
+        eval_response = client.post("/eval-runs", json=eval_payload)
         assert eval_response.status_code == 200
         eval_run_id = eval_response.json()["eval_run_id"]
         assert eval_response.json()["failure_count"] == 1
+        duplicate_eval_response = client.post("/eval-runs", json=eval_payload)
+        assert duplicate_eval_response.status_code == 200
+        assert duplicate_eval_response.json()["eval_run_id"] == eval_run_id
+        assert client.get("/evaluations/summary", params={"experiment_id": 1}).json()["eval_run_count"] == 1
 
         eval_detail = client.get(f"/eval-runs/{eval_run_id}").json()
+        assert eval_detail["external_eval_run_id"] == "pytest-eval-run-001"
+        assert eval_detail["evaluator_name"] == "pytest_eval_pipeline"
+        assert eval_detail["environment"] == {"runtime": "pytest"}
         failure_id = eval_detail["failures"][0]["eval_failure_id"]
         summary = client.get("/evaluations/summary", params={"experiment_id": 1}).json()
         assert summary["eval_run_count"] == 1
@@ -256,6 +268,21 @@ def test_eval_run_failures_can_be_saved_as_dataset_candidates(tmp_path: Path) ->
         failure_detail = client.get(f"/failure-library/{failure_id}").json()
         assert failure_detail["lineage"][-1]["target_type"] == "eval_failure"
         assert failure_detail["dataset_candidates"][0]["dataset_candidate_id"] == candidate["dataset_candidate_id"]
+
+        review_failure_response = client.patch(
+            f"/eval-failures/{failure_id}",
+            json={
+                "status": "valid_failure",
+                "root_cause": "dataset_gap",
+                "review_notes": "Confirmed as a useful failure for dataset repair.",
+                "reviewed_by_user_id": "Lena Keys",
+            },
+        )
+        assert review_failure_response.status_code == 200
+        reviewed_failure = review_failure_response.json()
+        assert reviewed_failure["status"] == "valid_failure"
+        assert reviewed_failure["root_cause"] == "dataset_gap"
+        assert reviewed_failure["review_notes"].startswith("Confirmed")
 
         failure_summary = client.get("/failure-library/summary", params={"experiment_id": 1}).json()
         assert failure_summary["failure_count"] == 1

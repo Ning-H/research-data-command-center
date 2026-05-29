@@ -21,6 +21,7 @@ export type DatasetSummary = {
   last_updated_date: string;
   created_at: string;
   asset_kind: "structured" | "raw";
+  data_structure: "structured" | "unstructured";
   original_filename: string;
   file_size_bytes: number;
   content_type: string;
@@ -117,8 +118,19 @@ export type RunHealthSummary = {
   signals: string[];
 };
 
+export type RunMetricSummary = {
+  initial_loss?: number;
+  final_loss?: number;
+  min_loss?: number;
+  loss_delta_percent?: number;
+  last_step?: number;
+  tokens_seen?: number;
+};
+
 export type RunSummary = {
   run_id: number;
+  program_id?: number | null;
+  experiment_id?: number | null;
   run_name: string;
   experiment_name: string;
   dataset_id: number;
@@ -135,6 +147,7 @@ export type RunSummary = {
   created_by_user_id: string;
   checkpoint_count: number;
   model_version_status: string;
+  metric_summary?: RunMetricSummary;
   health_summary: RunHealthSummary;
 };
 
@@ -144,6 +157,11 @@ export type RunMetric = {
   step: number;
   metric_name?: string;
   metric_value: number;
+};
+
+export type RunComputeMetric = RunMetric & {
+  node_id: string;
+  gpu_id: string;
 };
 
 export type RunCheckpoint = {
@@ -193,6 +211,8 @@ export type ModelVersionSummary = {
   model_version_name: string;
   checkpoint_id: number;
   run_id: number;
+  program_id: number;
+  experiment_id: number;
   dataset_id: number;
   dataset_version_id: number;
   run_config_id: number;
@@ -323,6 +343,7 @@ export type EvalFailure = {
   severity: string;
   status: string;
   failure_reason: string;
+  evidence_text: string;
   prompt_text: string;
   output_text: string;
   score: number;
@@ -330,6 +351,10 @@ export type EvalFailure = {
   model_name?: string;
   model_version_name?: string;
   dataset_candidate_count: number;
+  root_cause: string;
+  review_notes: string;
+  reviewed_at: string;
+  reviewed_by_user_id: string;
   created_at: string;
 };
 
@@ -386,7 +411,15 @@ export type CreateDatasetCandidatePayload = {
   target_dataset_id: number;
   proposed_input_text: string;
   proposed_target_text: string;
+  review_notes?: string;
   created_by_user_id?: string;
+};
+
+export type UpdateFailureReviewPayload = {
+  status?: string;
+  root_cause?: string;
+  review_notes?: string;
+  reviewed_by_user_id?: string;
 };
 
 export type DatasetVersionFromCandidatesResponse = {
@@ -422,14 +455,7 @@ export type RunDetail = RunSummary & {
     config: Record<string, string | number>;
   };
   metric_series: RunMetric[];
-  metric_summary: {
-    initial_loss: number;
-    final_loss: number;
-    min_loss: number;
-    loss_delta_percent: number;
-    last_step: number;
-    tokens_seen: number;
-  };
+  metric_summary: RunMetricSummary;
   compute_summary: {
     avg_gpu_utilization: number;
     max_memory_used_gb: number;
@@ -515,6 +541,106 @@ export type ResearchProgramCreateResponse = {
   updated_at: string;
 };
 
+export type DatasetRef = {
+  dataset_id: number;
+  dataset_version_id: number;
+  link_origin?: string;
+  link_role?: string;
+  linked_at?: string;
+  linked_by_user_id?: string;
+  source?: Record<string, unknown>;
+};
+
+export type ExperimentNote = {
+  note_id: number;
+  body: string;
+  author_name: string;
+  created_at: string;
+};
+
+export type ExperimentVariant = {
+  variant_id?: number;
+  variant_name: string;
+  variant_type: string;
+  description?: string;
+  linked_datasets?: DatasetRef[];
+};
+
+export type ExperimentSummary = {
+  experiment_id: number;
+  program_id: number;
+  experiment_name: string;
+  experiment_description: string;
+  research_question: string;
+  hypothesis: string;
+  experiment_type: string;
+  status: string;
+  owner_name: string;
+  evaluation_plan: string;
+  decision_notes: string;
+  input_source: string;
+  created_at: string;
+  updated_at: string;
+  created_by_user_id: string;
+  updated_by_user_id: string;
+  tags: string[];
+  variants: ExperimentVariant[];
+  notes: ExperimentNote[];
+  linked_datasets: DatasetRef[];
+  linked_run_ids: number[];
+  linked_model_version_ids: number[];
+};
+
+export type ExperimentDetail = ExperimentSummary & {
+  ui_workflow: {
+    can_update_from_ui: boolean;
+    supported_actions: string[];
+  };
+};
+
+export type ExperimentPayload = Partial<
+  Pick<
+    ExperimentSummary,
+    | "program_id"
+    | "experiment_name"
+    | "experiment_description"
+    | "research_question"
+    | "hypothesis"
+    | "experiment_type"
+    | "status"
+    | "owner_name"
+    | "evaluation_plan"
+    | "decision_notes"
+    | "tags"
+    | "variants"
+    | "linked_datasets"
+  >
+>;
+
+export type ExperimentCreateResponse = {
+  experiment_id: number;
+  program_id: number;
+  experiment_name: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ExperimentNextRunPlan = {
+  experiment_id: number;
+  program_id: number;
+  experiment_name: string;
+  can_register_run: boolean;
+  blocking_reasons: string[];
+  selected_dataset: DatasetRef | null;
+  run_registration_payload: Record<string, unknown>;
+  evaluation_requirement: {
+    summary: string;
+    compare_against: string;
+  };
+  next_actions: string[];
+};
+
 export async function listResearchPrograms(params: Record<string, string | number | undefined> = {}): Promise<ResearchProgramSummary[]> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -553,6 +679,44 @@ export async function deleteResearchProgramNote(
   return deleteJson(`/research-programs/${programId}/notes/${noteId}`);
 }
 
+export async function listExperiments(
+  params: Record<string, string | number | undefined> = {},
+): Promise<ExperimentSummary[]> {
+  const suffix = querySuffix(params);
+  const payload = await getJson<{ items: ExperimentSummary[] }>(`/experiments${suffix}`);
+  return payload.items;
+}
+
+export async function getExperiment(experimentId: string): Promise<ExperimentDetail> {
+  return getJson<ExperimentDetail>(`/experiments/${experimentId}`);
+}
+
+export async function createExperiment(payload: ExperimentPayload): Promise<ExperimentCreateResponse> {
+  return postJson<ExperimentCreateResponse>("/experiments", payload);
+}
+
+export async function updateExperiment(
+  experimentId: string,
+  payload: ExperimentPayload,
+): Promise<ExperimentDetail> {
+  return patchJson<ExperimentDetail>(`/experiments/${experimentId}`, payload);
+}
+
+export async function appendExperimentNote(
+  experimentId: string,
+  payload: { body: string; author_name?: string },
+): Promise<{ note_id: number; notes: ExperimentNote[]; experiment: ExperimentDetail }> {
+  return postJson(`/experiments/${experimentId}/notes`, payload);
+}
+
+export async function getExperimentNextRunPlan(experimentId: string): Promise<ExperimentNextRunPlan> {
+  return getJson<ExperimentNextRunPlan>(`/experiments/${experimentId}/next-run-plan`);
+}
+
+export async function getExperimentEvaluationSummary(experimentId: string): Promise<EvaluationSummary> {
+  return getJson<EvaluationSummary>(`/experiments/${experimentId}/evaluation-summary`);
+}
+
 export async function listDatasets(): Promise<DatasetSummary[]> {
   const payload = await getJson<{ items: DatasetSummary[] }>("/datasets");
   return payload.items;
@@ -572,6 +736,7 @@ export type RegisterDatasetPayload = {
   source_dataset_name?: string;
   source_url?: string;
   source_label?: string;
+  data_structure?: string;
 };
 
 export async function registerDataset(payload: RegisterDatasetPayload): Promise<DatasetDetail> {
@@ -597,6 +762,16 @@ export async function listRuns(): Promise<RunSummary[]> {
 
 export async function getRun(runId: string): Promise<RunDetail> {
   return getJson<RunDetail>(`/runs/${runId}`);
+}
+
+export async function getRunMetrics(runId: string): Promise<RunMetric[]> {
+  const payload = await getJson<{ items: RunMetric[] }>(`/runs/${runId}/metrics`);
+  return payload.items;
+}
+
+export async function getRunComputeMetrics(runId: string): Promise<RunComputeMetric[]> {
+  const payload = await getJson<{ items: RunComputeMetric[] }>(`/runs/${runId}/compute`);
+  return payload.items;
 }
 
 export async function searchCheckpoints(params: Record<string, string | number | undefined>): Promise<CheckpointSearchResult[]> {
@@ -655,6 +830,13 @@ export async function listFailures(
 
 export async function getFailure(evalFailureId: string): Promise<EvalFailureDetail> {
   return getJson<EvalFailureDetail>(`/failure-library/${evalFailureId}`);
+}
+
+export async function updateFailureReview(
+  evalFailureId: string | number,
+  payload: UpdateFailureReviewPayload,
+): Promise<EvalFailureDetail> {
+  return patchJson<EvalFailureDetail>(`/eval-failures/${evalFailureId}`, payload);
 }
 
 export async function createDatasetCandidateFromFailure(

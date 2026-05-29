@@ -1,10 +1,12 @@
-# Model Registry and Checkpoint Promotion
+# Models and Checkpoint Promotion
 
 ## Product Rule
 
 Researchers train outside the platform and save checkpoints during the run. A
-checkpoint can become a model version only through a promotion/registration
-event.
+checkpoint can become a model version only through a promotion event.
+
+Detailed versioning and immutability rules live in
+[`docs/model_versioning_rules.md`](model_versioning_rules.md).
 
 The researcher provides:
 
@@ -41,7 +43,7 @@ GET /models/{model_version_id}
 GET /models/{model_version_id}/lineage
 ```
 
-Example registration payload:
+Example promotion payload:
 
 ```json
 {
@@ -69,8 +71,8 @@ dataset_version_id
 ```
 
 The model artifact URI points to the checkpoint artifact produced by the
-training job. The registry also writes a small object-store-style registration
-manifest under:
+training job. The platform also writes a small object-store-style manifest
+under:
 
 ```text
 storage/object_store/models/model_id={model_id}/model_version_id={model_version_id}/registration_manifest.json

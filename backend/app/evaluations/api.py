@@ -6,8 +6,9 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import settings
-from app.evaluations.lifecycle import register_eval_run, register_eval_suite
+from app.evaluations.lifecycle import register_eval_run, register_eval_suite, update_eval_failure_review
 from app.evaluations.repository import EvaluationRepository
+from app.evaluations.schemas import EvalRunCreatePayload, EvalSuiteCreatePayload
 
 router = APIRouter(tags=["evaluations"])
 
@@ -26,11 +27,14 @@ def get_evaluation_repository() -> EvaluationRepository:
 
 @router.post("/eval-suites")
 def create_eval_suite(
-    payload: dict[str, Any],
+    payload: EvalSuiteCreatePayload,
     storage_root: Annotated[Path, Depends(get_evaluation_storage_root)],
 ) -> dict[str, Any]:
     try:
-        result = register_eval_suite(storage_root=storage_root, payload=payload)
+        result = register_eval_suite(
+            storage_root=storage_root,
+            payload=payload.model_dump(exclude_none=True),
+        )
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
@@ -66,11 +70,14 @@ def get_eval_suite(
 
 @router.post("/eval-runs")
 def create_eval_run(
-    payload: dict[str, Any],
+    payload: EvalRunCreatePayload,
     storage_root: Annotated[Path, Depends(get_evaluation_storage_root)],
 ) -> dict[str, Any]:
     try:
-        result = register_eval_run(storage_root=storage_root, payload=payload)
+        result = register_eval_run(
+            storage_root=storage_root,
+            payload=payload.model_dump(exclude_none=True),
+        )
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
@@ -174,6 +181,31 @@ def get_eval_failure(
     eval_failure_id: int,
     repository: Annotated[EvaluationRepository, Depends(get_evaluation_repository)],
 ) -> dict[str, Any]:
+    failure = repository.get_eval_failure(eval_failure_id)
+    if failure is None:
+        raise HTTPException(status_code=404, detail=f"Eval failure not found: {eval_failure_id}")
+    return failure
+
+
+@router.patch("/eval-failures/{eval_failure_id}")
+def update_eval_failure(
+    eval_failure_id: int,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_evaluation_storage_root)],
+) -> dict[str, Any]:
+    try:
+        update_eval_failure_review(
+            storage_root=storage_root,
+            eval_failure_id=eval_failure_id,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    repository = EvaluationRepository(
+        duckdb_path=storage_root / "duckdb" / "research_command_center.duckdb",
+        storage_root=storage_root,
+    )
     failure = repository.get_eval_failure(eval_failure_id)
     if failure is None:
         raise HTTPException(status_code=404, detail=f"Eval failure not found: {eval_failure_id}")

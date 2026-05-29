@@ -113,6 +113,7 @@ async def register_raw_dataset_endpoint(
     data_purpose: Annotated[str, Form()] = "",
     category: Annotated[str, Form()] = "",
     task_type: Annotated[str, Form()] = "",
+    data_structure: Annotated[str, Form()] = "unstructured",
 ) -> dict[str, Any]:
     data = await file.read()
     try:
@@ -128,6 +129,7 @@ async def register_raw_dataset_endpoint(
                 "data_purpose": data_purpose,
                 "category": category,
                 "task_type": task_type,
+                "data_structure": data_structure,
             },
         )
     except ValueError as exc:

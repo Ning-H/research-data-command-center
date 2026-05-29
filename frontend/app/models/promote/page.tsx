@@ -15,8 +15,8 @@ export default function PromoteCheckpointPage({ searchParams = {} }: PromotePage
     <section className="page">
       <div className="page-header">
         <div>
-          <p className="eyebrow">Models & Checkpoints / Register</p>
-          <h1>Promote Checkpoint</h1>
+          <p className="eyebrow">Training Runs & Checkpoints / Promote</p>
+          <h1>Create Model Version</h1>
           <p className="subtle">
             Create an immutable model version from a checkpoint. The API derives run and dataset
             lineage from `checkpoint_id`.
@@ -30,7 +30,7 @@ export default function PromoteCheckpointPage({ searchParams = {} }: PromotePage
 
       <form className="panel form-panel" action={promoteModelVersion}>
         <div>
-          <h2>Registration Metadata</h2>
+          <h2>Model Version Context</h2>
           <p className="subtle">
             Researchers provide human context here; technical lineage is copied from the checkpoint.
           </p>
@@ -75,12 +75,12 @@ export default function PromoteCheckpointPage({ searchParams = {} }: PromotePage
         </label>
         <label className="field">
           <span>promotion_notes</span>
-          <textarea name="promotion_notes" defaultValue="Registered from the checkpoint search workflow." />
+          <textarea name="promotion_notes" defaultValue="Created from the checkpoint search workflow." />
         </label>
 
         <div className="action-row">
           <button className="btn btn--primary" type="submit">
-            Register model version
+            Create model version
           </button>
         </div>
       </form>

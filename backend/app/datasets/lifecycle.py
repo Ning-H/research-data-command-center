@@ -164,6 +164,7 @@ def register_raw_dataset(
         "parent_dataset_version_id": "",
         "created_by_user_id": str(payload.get("created_by_user_id") or DEFAULT_CREATED_BY_USER_ID),
         "version_notes": str(payload.get("version_notes") or ""),
+        "data_structure": str(payload.get("data_structure") or "unstructured"),
         "asset_kind": "raw",
         "original_filename": safe_filename,
         "file_size_bytes": len(data),
@@ -770,6 +771,7 @@ def _update_manifest(
             "parent_dataset_version_id": parent_dataset_version_id,
             "created_by_user_id": str(payload.get("created_by_user_id") or DEFAULT_CREATED_BY_USER_ID),
             "version_notes": str(payload.get("version_notes") or ""),
+            "data_structure": str(payload.get("data_structure") or "structured"),
         }
     )
     path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")

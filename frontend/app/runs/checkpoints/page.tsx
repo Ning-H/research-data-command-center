@@ -16,8 +16,8 @@ export default async function CheckpointsPage({ searchParams = {} }: Checkpoints
     <section className="page">
       <div className="page-header">
         <div>
-          <p className="eyebrow">Training Runs / Checkpoints</p>
-          <h1>Checkpoint Search</h1>
+          <p className="eyebrow">Training Runs & Checkpoints</p>
+          <h1>Checkpoint Ranking</h1>
           <p className="subtle">
             Compare checkpoints across completed runs that used the same governed dataset,
             trainer, and framework. The top result is the best promotion candidate for the
@@ -25,7 +25,7 @@ export default async function CheckpointsPage({ searchParams = {} }: Checkpoints
           </p>
         </div>
         <Link className="btn btn--secondary" href="/training-runs">
-          Training Runs
+          Training Runs & Checkpoints
           <ArrowRight aria-hidden="true" size={16} />
         </Link>
       </div>

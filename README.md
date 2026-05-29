@@ -22,14 +22,13 @@ failures, and dataset-iteration candidates.
 
 As of the latest local check:
 
-- Branch: `main`, aligned with `origin/main`
-- Latest commit: `1e4385c Add dataset versioning lifecycle, evaluations module, and research programs UI`
-- Backend validation: `26 passed`
+- Branch: `main`, published directly to `origin/main`
+- Backend validation: `27 passed`
 - Frontend validation: `npm run build` passes
 - Local backend: `http://127.0.0.1:8000/health`
 - Local frontend: `http://localhost:3000`
-- Evaluation loop demo data: `7` eval runs, `22` failures, `22` dataset candidates after the latest local lifecycle seed
-- Verified UI flow: failure review -> dataset candidate approval -> candidate-derived dataset version publish
+- Current product checkpoint: data asset registration, experiment planning, run/checkpoint inspection, model review, evaluation ingestion, failure review, and dataset-iteration handoff are all represented in the API/UI.
+- Verified lifecycle flow: failure review -> dataset candidate approval -> candidate-derived dataset version publish -> next experiment planning.
 
 One local-state caveat: generated artifacts exist under `storage/object_store`
 and `storage/parquet`, but the live metadata API can still return empty lists if
@@ -64,13 +63,12 @@ Research Data Command Center
 ├── Research Programs
 ├── Data Assets
 ├── Experiments
-├── Training Runs
-├── Models & Checkpoints
+├── Training Runs & Checkpoints
+├── Models
 ├── Evaluations
 ├── Inference Observability
 ├── Failure Library
 ├── Dataset Iterations
-├── Workspace
 ├── Docs
 └── Settings
 ```
@@ -100,6 +98,8 @@ API and SDK references live under Docs. Product surfaces should answer at least 
 
 - Master agent guidelines: `docs/ai_agent_build_guidelines.md`
 - Research lifecycle direction: `docs/research_lifecycle_command_center.md`
+- Model registry direction: `docs/model_registry.md`
+- Model versioning rules: `docs/model_versioning_rules.md`
 - Shared contract docs: `docs/shared_data_contract.md`
 - Checkpoint 0 brief: `docs/checkpoint_0.md`
 - Canonical keys/enums/table contracts: `shared/research_command_center_contract/`
@@ -112,13 +112,13 @@ API and SDK references live under Docs. Product surfaces should answer at least 
 
 - Research Programs: registry/detail/create/edit flow, program notes, and links into datasets/runs.
 - Data Assets: public dataset ingestion, version registration, draft/publish lifecycle, records, schema, quality, lineage, and access events.
-- Experiments: experiment registration, updates, and appendable notes.
-- Training Runs: external API/SDK run registration, raw metric append, checkpoint append, completion, and run lineage.
-- Models & Checkpoints: cross-run checkpoint search, checkpoint-to-model-version registration, model detail, model lineage, and model comparison.
-- Evaluations: eval-suite registration, eval-run registration, model-level eval lookup, experiment evaluation summary, aggregate evaluation summary, and an API-backed evaluation dashboard.
-- Failure Library: evaluation-failure browsing, filtering, summaries, detail lookup, lineage inspection, and candidate creation.
-- Dataset Candidates: convert failures into dataset candidates, review candidate status, inspect dataset iteration summaries, and publish candidate-derived dataset versions.
-- Frontend Shell: routes exist for the major product areas, including research programs, datasets, experiments, runs, models, evaluations, failure library, dataset iterations, workspace, docs, and settings.
+- Experiments: experiment registry, create/detail/edit screens, notes, dataset/run/model links, and next-run planning context.
+- Training Runs & Checkpoints: external API/SDK run registration, raw metric append, checkpoint append, completion, run lineage, run filters, checkpoint comparison, and cross-run checkpoint ranking.
+- Models: checkpoint-to-model-version promotion, model detail, model lineage, review context, evaluation readiness, filtering, and model comparison.
+- Evaluations: eval-suite registration, SDK-style eval-run submission, idempotent external eval IDs, model-level eval lookup, experiment evaluation summary, aggregate evaluation summary, and an API-backed evaluation dashboard.
+- Failure Library: evaluation-failure browsing, filtering, summaries, detail lookup, lineage inspection, review status/root-cause notes, and candidate creation.
+- Dataset Candidates: convert failures into dataset candidates, review candidate status, inspect dataset iteration summaries, and publish candidate-derived dataset versions for the next experiment.
+- Frontend Shell: routes exist for the major product areas, including research programs, datasets, experiments, runs, models, evaluations, failure library, dataset iterations, docs, and settings.
 
 ## Local Development
 
@@ -182,12 +182,14 @@ Useful local scripts:
 ```bash
 uv run --python 3.13 python scripts/seed_demo_runs.py
 uv run --python 3.13 python scripts/run_study_material_full_lifecycle.py
+uv run --python 3.13 python scripts/run_sdk_sample_eval.py
 ```
 
 The full lifecycle script is the most complete demo path for the current product
 story. It creates a study-material research program path with datasets,
 experiments, training runs, checkpoints, evaluation suites/runs, failures, and
-dataset candidates.
+dataset candidates. The SDK sample eval script submits a repeatable eval run
+against the local API using the Python SDK and an external eval-run ID.
 
 After running it locally, open:
 
@@ -206,7 +208,7 @@ Evaluations -> Failure Library -> Failure Detail -> Save Candidate
 
 ## Next Build Slice
 
-The strongest next slice is to connect the newly published dataset version back
-into the next experiment/run decision: show which approved failures created the
-version, which experiment should consume it, and whether the next model version
-improves against the same rubric.
+The strongest next slice is to close the loop after a candidate-derived dataset
+version is published: make the recommended next experiment/run explicit, attach
+the new run to the version that triggered it, and show whether the next model
+version improves against the same rubric.

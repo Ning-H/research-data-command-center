@@ -9,9 +9,8 @@ import {
   Home,
   LineChart,
   Library,
-  RefreshCw,
+  ListChecks,
   Settings,
-  Workflow,
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -23,13 +22,12 @@ const navItems = [
   { href: "/research-programs", label: "Research Programs", icon: BrainCircuit },
   { href: "/datasets", label: "Data Assets", icon: Database },
   { href: "/experiments", label: "Experiments", icon: FlaskConical },
-  { href: "/training-runs", label: "Training Runs", icon: LineChart },
-  { href: "/models-checkpoints", label: "Models & Checkpoints", icon: Boxes },
+  { href: "/training-runs", label: "Training Runs & Checkpoints", icon: LineChart },
+  { href: "/models", label: "Models", icon: Boxes },
   { href: "/evaluations", label: "Evaluations", icon: ClipboardCheck },
   { href: "/inference-observability", label: "Inference Observability", icon: Activity },
   { href: "/failure-library", label: "Failure Library", icon: Library },
-  { href: "/dataset-iterations", label: "Dataset Iterations", icon: RefreshCw },
-  { href: "/workspace", label: "Workspace", icon: Workflow },
+  { href: "/dataset-iterations", label: "Dataset Iterations", icon: ListChecks },
   { href: "/docs", label: "Docs", icon: BookOpen },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

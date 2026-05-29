@@ -25,13 +25,13 @@ export default async function ModelDetailPage({ params }: ModelDetailPageProps) 
           <p className="eyebrow">Model Detail</p>
           <h1>{model.model_version_name}</h1>
           <p className="subtle">
-            Immutable candidate model version registered from checkpoint_id {model.checkpoint_id}.
+            Immutable candidate model version created from checkpoint_id {model.checkpoint_id}.
             Evaluation and comparison results will attach here next.
           </p>
         </div>
-        <Link className="btn btn--secondary" href="/models-checkpoints">
+        <Link className="btn btn--secondary" href="/models">
           <ArrowLeft aria-hidden="true" size={16} />
-          Models & Checkpoints
+          Models
         </Link>
       </div>
 

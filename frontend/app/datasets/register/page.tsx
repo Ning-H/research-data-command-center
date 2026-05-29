@@ -2,9 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { registerDataset, registerRawDataset } from "../../../lib/api";
-import { RegisterTabs } from "./RegisterTabs";
 
 export const dynamic = "force-dynamic";
+
+const CATEGORIES = [
+  "Raw data",
+  "Post-training / SFT",
+  "Preference data",
+  "Eval data",
+  "Safety / red-team",
+  "Inference traces",
+  "Other",
+];
 
 export default function RegisterDatasetPage() {
   return (
@@ -12,10 +21,10 @@ export default function RegisterDatasetPage() {
       <div className="page-header">
         <div>
           <p className="eyebrow">Data Assets</p>
-          <h1>Register Dataset</h1>
+          <h1>Register Data Asset</h1>
           <p className="subtle">
-            Register a new data asset as version 1. Use structured records for normalized, quality-scored
-            datasets, or upload any file as a raw asset stored as-is.
+            Register a new data asset as version 1. Structured records are parsed, profiled, and
+            quality-scored. Unstructured data and uploaded files are stored as-is.
           </p>
         </div>
         <Link className="btn btn--secondary" href="/datasets">
@@ -23,161 +32,133 @@ export default function RegisterDatasetPage() {
         </Link>
       </div>
 
-      <RegisterTabs structured={<StructuredForm />} raw={<RawForm />} />
+      <form className="panel form-panel" action={registerAssetAction}>
+        <div className="form-grid">
+          <label className="field">
+            <span>name</span>
+            <input name="name" required placeholder="Crawl snapshot 2026-05" />
+          </label>
+          <label className="field">
+            <span>data structure</span>
+            <select name="data_structure" defaultValue="structured">
+              <option value="structured">Structured data</option>
+              <option value="unstructured">Unstructured</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>category</span>
+            <select name="category" defaultValue="Raw data">
+              {CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>source_label</span>
+            <select name="source_label" defaultValue="SYNTHETIC_REALISTIC">
+              <option value="PUBLIC_REAL">PUBLIC_REAL</option>
+              <option value="GENERATED_REAL">GENERATED_REAL</option>
+              <option value="SYNTHETIC_REALISTIC">SYNTHETIC_REALISTIC</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>task_type</span>
+            <input name="task_type" placeholder="study_guide_generation (structured only)" />
+          </label>
+        </div>
+
+        <label className="field">
+          <span>data_purpose</span>
+          <textarea name="data_purpose" placeholder="Why this asset is being stored and how it will be used." />
+        </label>
+        <label className="field">
+          <span>description</span>
+          <textarea name="description" placeholder="What this asset contains." />
+        </label>
+
+        <div className="data-input-grid">
+          <label className="field">
+            <span>enter data</span>
+            <textarea name="records" rows={9} className="mono" placeholder={DATA_PLACEHOLDER} />
+            <span className="field-hint">
+              Structured: a JSON array of objects, or one JSON object per line (JSONL). Unstructured:
+              any text. Leave empty if uploading a file.
+            </span>
+          </label>
+          <label className="field">
+            <span>or upload a file</span>
+            <input name="file" type="file" />
+            <span className="field-hint">
+              Any file type (Parquet, CSV, images, archives, ...). Always stored as-is.
+            </span>
+          </label>
+        </div>
+
+        <div className="action-row">
+          <button className="btn btn--primary" type="submit">
+            Register asset
+          </button>
+        </div>
+      </form>
     </section>
   );
 }
 
-function StructuredForm() {
-  return (
-    <form className="panel form-panel" action={registerDatasetAction}>
-      <div>
-        <h2>Structured records</h2>
-        <p className="subtle">
-          Records are normalized into versioned storage with schema profiling, quality metrics, and lineage.
-        </p>
-      </div>
+const DATA_PLACEHOLDER = `Structured example:
+[
+  { "instruction": "Explain binary search", "response": "Finds a target in sorted data." }
+]
 
-      <div className="form-grid">
-        <label className="field">
-          <span>name</span>
-          <input name="name" required placeholder="Registered Python Study Notes" />
-        </label>
-        <label className="field">
-          <span>task_type</span>
-          <input name="task_type" required placeholder="study_guide_generation" />
-        </label>
-        <label className="field">
-          <span>source_label</span>
-          <select name="source_label" defaultValue="SYNTHETIC_REALISTIC">
-            <option value="PUBLIC_REAL">PUBLIC_REAL</option>
-            <option value="GENERATED_REAL">GENERATED_REAL</option>
-            <option value="SYNTHETIC_REALISTIC">SYNTHETIC_REALISTIC</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>category</span>
-          <input name="category" placeholder="Study-guide generation" />
-        </label>
-        <label className="field">
-          <span>source_dataset_name</span>
-          <input name="source_dataset_name" placeholder="registered/python-study-notes" />
-        </label>
-        <label className="field">
-          <span>source_url</span>
-          <input name="source_url" placeholder="s3://research-data/raw/python-study-notes.jsonl" />
-        </label>
-      </div>
+Unstructured example:
+Any free-form notes, logs, or text.`;
 
-      <label className="field">
-        <span>data_purpose</span>
-        <textarea name="data_purpose" placeholder="Training data for structured technical study-guide generation." />
-      </label>
-      <label className="field">
-        <span>description</span>
-        <textarea name="description" placeholder="What this dataset contains and how it should be used." />
-      </label>
-      <label className="field">
-        <span>records</span>
-        <textarea name="records" required rows={10} className="mono" placeholder={RECORDS_PLACEHOLDER} />
-        <span className="field-hint">
-          Paste a JSON array of objects, or one JSON object per line (JSONL). Must be non-empty.
-        </span>
-      </label>
-
-      <div className="action-row">
-        <button className="btn btn--primary" type="submit">
-          Register dataset
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function RawForm() {
-  return (
-    <form className="panel form-panel" action={registerRawAction}>
-      <div>
-        <h2>Raw file upload</h2>
-        <p className="subtle">
-          Upload any file (Parquet, CSV, images, archives, unstructured data). It is stored as-is in object
-          storage without parsing. No quality score or schema is generated.
-        </p>
-      </div>
-
-      <label className="field">
-        <span>file</span>
-        <input name="file" type="file" required />
-        <span className="field-hint">Any file type. Stored verbatim as the raw asset.</span>
-      </label>
-
-      <div className="form-grid">
-        <label className="field">
-          <span>name</span>
-          <input name="name" required placeholder="Crawl snapshot 2026-05" />
-        </label>
-        <label className="field">
-          <span>source_label</span>
-          <select name="source_label" defaultValue="SYNTHETIC_REALISTIC">
-            <option value="PUBLIC_REAL">PUBLIC_REAL</option>
-            <option value="GENERATED_REAL">GENERATED_REAL</option>
-            <option value="SYNTHETIC_REALISTIC">SYNTHETIC_REALISTIC</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>category</span>
-          <input name="category" placeholder="Raw blob" />
-        </label>
-      </div>
-
-      <label className="field">
-        <span>data_purpose</span>
-        <textarea name="data_purpose" placeholder="Why this raw asset is being stored." />
-      </label>
-      <label className="field">
-        <span>description</span>
-        <textarea name="description" placeholder="What this file contains." />
-      </label>
-
-      <div className="action-row">
-        <button className="btn btn--primary" type="submit">
-          Upload raw asset
-        </button>
-      </div>
-    </form>
-  );
-}
-
-const RECORDS_PLACEHOLDER = `[
-  { "instruction": "Explain binary search for Python learners.", "response": "Binary search finds a target in sorted data." },
-  { "instruction": "Explain sliding window for Python learners.", "response": "Sliding window tracks a contiguous range." }
-]`;
-
-async function registerDatasetAction(formData: FormData) {
-  "use server";
-
-  const dataset = await registerDataset({
-    name: field(formData, "name"),
-    task_type: field(formData, "task_type"),
-    source_label: field(formData, "source_label") || "SYNTHETIC_REALISTIC",
-    category: field(formData, "category"),
-    source_dataset_name: field(formData, "source_dataset_name"),
-    source_url: field(formData, "source_url"),
-    data_purpose: field(formData, "data_purpose"),
-    description: field(formData, "description"),
-    records: parseRecords(field(formData, "records")),
-  });
-  redirect(`/datasets/${dataset.dataset_id}`);
-}
-
-async function registerRawAction(formData: FormData) {
+async function registerAssetAction(formData: FormData) {
   "use server";
 
   const file = formData.get("file");
-  if (!(file instanceof File) || file.size === 0) {
-    throw new Error("a non-empty file is required");
+  const hasFile = file instanceof File && file.size > 0;
+  const dataStructure = field(formData, "data_structure") || "structured";
+  const text = field(formData, "records");
+
+  // Option A: structured + typed records -> parsed pipeline.
+  // Anything else (unstructured text, or any uploaded file) -> stored as-is (raw).
+  if (!hasFile && dataStructure === "structured") {
+    if (!text) {
+      throw new Error("enter records or upload a file");
+    }
+    const dataset = await registerDataset({
+      name: field(formData, "name"),
+      task_type: field(formData, "task_type") || "general_records",
+      source_label: field(formData, "source_label") || "SYNTHETIC_REALISTIC",
+      category: field(formData, "category"),
+      data_purpose: field(formData, "data_purpose"),
+      description: field(formData, "description"),
+      data_structure: "structured",
+      records: parseRecords(text),
+    });
+    redirect(`/datasets/${dataset.dataset_id}`);
   }
-  const dataset = await registerRawDataset(formData);
+
+  if (!hasFile && !text) {
+    throw new Error("enter data or upload a file");
+  }
+
+  const rawForm = new FormData();
+  if (hasFile) {
+    rawForm.set("file", file);
+  } else {
+    const safeName = field(formData, "name").replace(/[^A-Za-z0-9._-]+/g, "_") || "data";
+    rawForm.set("file", new Blob([text], { type: "text/plain" }), `${safeName}.txt`);
+  }
+  rawForm.set("name", field(formData, "name"));
+  rawForm.set("source_label", field(formData, "source_label") || "SYNTHETIC_REALISTIC");
+  rawForm.set("category", field(formData, "category"));
+  rawForm.set("description", field(formData, "description"));
+  rawForm.set("data_purpose", field(formData, "data_purpose"));
+  rawForm.set("data_structure", dataStructure);
+  const dataset = await registerRawDataset(rawForm);
   redirect(`/datasets/${dataset.dataset_id}`);
 }
 
@@ -186,10 +167,6 @@ function field(formData: FormData, name: string) {
 }
 
 function parseRecords(raw: string): Array<Record<string, unknown>> {
-  if (!raw) {
-    throw new Error("records is required");
-  }
-
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -203,7 +180,7 @@ function parseRecords(raw: string): Array<Record<string, unknown>> {
 
   const records = Array.isArray(parsed) ? parsed : [parsed];
   if (records.length === 0 || !records.every((record) => isPlainObject(record))) {
-    throw new Error("records must be a non-empty list of JSON objects");
+    throw new Error("structured data must be a non-empty list of JSON objects");
   }
   return records as Array<Record<string, unknown>>;
 }

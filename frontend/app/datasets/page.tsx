@@ -59,17 +59,21 @@ export default async function DatasetsPage() {
               <th>Records</th>
               <th>Quality</th>
               <th>Source</th>
+              <th>Registered</th>
               <th />
             </tr>
           </thead>
           <tbody>
             {datasets.map((dataset) => {
               const isRaw = dataset.asset_kind === "raw";
+              const isUnstructured = dataset.data_structure === "unstructured";
               return (
                 <tr key={`${dataset.dataset_id}-${dataset.dataset_version_id}`}>
                   <td>
                     <strong>{dataset.name}</strong>
-                    {isRaw ? <span className="badge neutral raw-badge">RAW</span> : null}
+                    {isUnstructured ? (
+                      <span className="badge neutral raw-badge">UNSTRUCTURED</span>
+                    ) : null}
                     <div className="muted-row">
                       {isRaw ? dataset.original_filename : dataset.source_dataset_name}
                     </div>
@@ -88,6 +92,10 @@ export default async function DatasetsPage() {
                     )}
                   </td>
                   <td>{dataset.source_label}</td>
+                  <td>
+                    {formatDate(dataset.registration_date)}
+                    <div className="muted-row">upd {formatDate(dataset.last_updated_date)}</div>
+                  </td>
                   <td>
                     <Link className="btn btn--secondary" href={`/datasets/${dataset.dataset_id}`}>
                       <Database aria-hidden="true" size={16} />
@@ -127,4 +135,16 @@ function formatBytes(bytes: number) {
     unit += 1;
   }
   return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+}
+
+function formatDate(value: string) {
+  try {
+    return new Date(value).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return value;
+  }
 }

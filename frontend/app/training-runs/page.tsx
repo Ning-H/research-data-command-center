@@ -1,1 +1,3 @@
-export { default } from "../runs/page";
+import RunsPage from "../runs/page";
+
+export default RunsPage;

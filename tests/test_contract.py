@@ -100,3 +100,6 @@ def test_core_lineage_tables_keep_foreign_keys_explicit() -> None:
     assert {"eval_run_id", "model_version_id", "dataset_version_id"}.issubset(
         tables["eval_outputs"].columns
     )
+    assert {"external_eval_run_id", "evaluator_name", "environment_json"}.issubset(
+        tables["eval_runs"].columns
+    )

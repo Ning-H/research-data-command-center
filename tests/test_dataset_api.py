@@ -194,6 +194,7 @@ def test_dataset_registration_and_version_creation_api(tmp_path: Path) -> None:
         assert registered["name"] == "Registered Python Study Notes"
         assert registered["source_url"] == "s3://research-data/raw/python-study-notes.jsonl"
         assert registered["record_count"] == 2
+        assert registered["data_structure"] == "structured"
 
         version_response = client.post(
             "/datasets/9/versions",
@@ -421,10 +422,13 @@ def test_register_raw_dataset_api(tmp_path: Path) -> None:
         assert registered["dataset_id"] == 9
         assert registered["dataset_version_id"] == 1
         assert registered["asset_kind"] == "raw"
+        assert registered["data_structure"] == "unstructured"
         assert registered["original_filename"] == "snapshot.parquet"
         assert registered["file_size_bytes"] == len(raw_bytes)
         assert registered["record_count"] == 0
         assert registered["quality_label"] == "Unprocessed"
+        assert registered["registration_date"]
+        assert registered["last_updated_date"]
 
         # The raw bytes are stored verbatim in object storage.
         stored = Path(registered["raw_object_uri"])

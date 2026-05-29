@@ -770,6 +770,7 @@ def _dataset_summary_from_row(row: dict[str, Any], storage_root: Path) -> dict[s
         "quality_label": _quality_label(quality_score),
         "category": manifest.get("category") or _category_for_task(row["task_type"]),
         "asset_kind": "raw" if is_raw else "structured",
+        "data_structure": str(manifest.get("data_structure") or ("unstructured" if is_raw else "structured")),
         "original_filename": str(manifest.get("original_filename") or ""),
         "file_size_bytes": int(manifest.get("file_size_bytes") or 0),
         "content_type": str(manifest.get("content_type") or ""),

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { getDataset, type DatasetDetail } from "../../../lib/api";
@@ -25,54 +26,42 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
           <span>{dataset.name}</span>
         </nav>
 
-        <div className="dataset-overview-left">
-          <div className="raw-asset-heading">
-            <span className="badge neutral raw-badge">RAW</span>
-            <p className="subtle">
-              This asset is stored as-is in object storage. It has not been parsed, profiled, or
-              quality-scored.
-            </p>
+        <div className="dataset-hero-panel dataset-hero-panel--wide">
+          <div className="dataset-hero-topline">
+            <div className="dataset-kicker">
+              <span className="badge neutral">{dataset.data_structure.toUpperCase()}</span>
+              <span>{dataset.category}</span>
+              <span>dataset_id {dataset.dataset_id}</span>
+              <span>v{dataset.dataset_version_id}</span>
+            </div>
+            <div className="dataset-actions">
+              <Link className="btn btn--secondary btn--sm" href="/datasets">
+                <ArrowLeft aria-hidden="true" size={15} />
+                Catalog
+              </Link>
+            </div>
           </div>
-          <dl className="dataset-props">
-            <div className="dataset-prop-row">
-              <dt>Name</dt>
-              <dd className="dataset-prop-name">{dataset.name}</dd>
-            </div>
-            <div className="dataset-prop-row">
-              <dt>Version</dt>
-              <dd>v{dataset.dataset_version_id}</dd>
-            </div>
-            <div className="dataset-prop-row">
-              <dt>File</dt>
-              <dd className="mono">{dataset.original_filename}</dd>
-            </div>
-            <div className="dataset-prop-row">
-              <dt>Size</dt>
-              <dd>{formatBytes(dataset.file_size_bytes)}</dd>
-            </div>
-            <div className="dataset-prop-row">
-              <dt>Type</dt>
-              <dd>{dataset.content_type || dataset.data_format}</dd>
-            </div>
-            <div className="dataset-prop-row">
-              <dt>Source</dt>
-              <dd>{dataset.source_label}</dd>
-            </div>
+          <h1>{dataset.name}</h1>
+          <p className="dataset-hero-desc">
+            This asset is stored as-is in object storage. It has not been parsed, profiled, or
+            quality-scored.
+          </p>
+
+          <div className="dataset-fact-grid dataset-fact-grid--raw">
+            <DatasetFact label="Data structure" value={dataset.data_structure} />
+            <DatasetFact label="Category" value={dataset.category} />
+            <DatasetFact label="Version" value={`v${dataset.dataset_version_id}`} />
+            <DatasetFact label="File" value={dataset.original_filename} mono />
+            <DatasetFact label="Size" value={formatBytes(dataset.file_size_bytes)} />
+            <DatasetFact label="Type" value={dataset.content_type || dataset.data_format} />
+            <DatasetFact label="Source" value={dataset.source_label} />
             {dataset.description && (
-              <div className="dataset-prop-row">
-                <dt>Description</dt>
-                <dd className="dataset-prop-desc">{dataset.description}</dd>
-              </div>
+              <DatasetFact label="Description" value={dataset.description} wide />
             )}
-            <div className="dataset-prop-row">
-              <dt>Object URI</dt>
-              <dd className="mono dataset-prop-desc">{dataset.raw_object_uri}</dd>
-            </div>
-            <div className="dataset-prop-row">
-              <dt>Registered</dt>
-              <dd>{formatDate(dataset.registration_date)}</dd>
-            </div>
-          </dl>
+            <DatasetFact label="Object URI" value={dataset.raw_object_uri} mono wide />
+            <DatasetFact label="Registered" value={formatDate(dataset.registration_date)} />
+            <DatasetFact label="Updated" value={formatDate(dataset.last_updated_date)} />
+          </div>
         </div>
       </section>
     );
@@ -86,51 +75,55 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
         <span>{dataset.name}</span>
       </nav>
 
-      {/* Two-column: left = name/description/stats, right = schema */}
       <div className="dataset-overview">
-        <div className="dataset-overview-left">
-          <dl className="dataset-props">
-            <div className="dataset-prop-row">
-              <dt>Name</dt>
-              <dd className="dataset-prop-name">{dataset.name}</dd>
+        <div className="dataset-hero-panel">
+          <div className="dataset-hero-topline">
+            <div className="dataset-kicker">
+              <span className="badge">Structured dataset</span>
+              <span>dataset_id {dataset.dataset_id}</span>
+              <span>v{dataset.dataset_version_id}</span>
             </div>
-            <div className="dataset-prop-row">
-              <dt>Version</dt>
-              <dd>v{dataset.dataset_version_id}</dd>
+            <div className="dataset-actions">
+              <Link className="btn btn--secondary btn--sm" href="/datasets">
+                <ArrowLeft aria-hidden="true" size={15} />
+                Catalog
+              </Link>
+              {isExternalUrl(dataset.source_url) && (
+                <a
+                  className="btn btn--dark btn--sm"
+                  href={dataset.source_url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Source
+                  <ExternalLink aria-hidden="true" size={14} />
+                </a>
+              )}
             </div>
-            <div className="dataset-prop-row">
-              <dt>Records</dt>
-              <dd>{dataset.record_count.toLocaleString()}</dd>
-            </div>
-            <div className="dataset-prop-row">
-              <dt>Format</dt>
-              <dd>{dataset.data_format}</dd>
-            </div>
-            {dataset.description && (
-              <div className="dataset-prop-row">
-                <dt>Description</dt>
-                <dd className="dataset-prop-desc">{dataset.description}</dd>
-              </div>
-            )}
-            <div className="dataset-prop-row">
-              <dt>Quality</dt>
-              <dd className={qualityMetaClass(dataset.quality_score)}>
-                {dataset.quality_score}/100 · {dataset.quality_label}
-              </dd>
-            </div>
-            <div className="dataset-prop-row">
-              <dt>Registered</dt>
-              <dd>{formatDate(dataset.registration_date)}</dd>
-            </div>
-            <div className="dataset-prop-row">
-              <dt>Updated</dt>
-              <dd>{formatDate(dataset.last_updated_date)}</dd>
-            </div>
-          </dl>
+          </div>
+
+          <h1>{dataset.name}</h1>
+          {dataset.description && <p className="dataset-hero-desc">{dataset.description}</p>}
+
+          <div className="dataset-fact-grid">
+            <DatasetFact label="Version" value={`v${dataset.dataset_version_id}`} />
+            <DatasetFact label="Records" value={dataset.record_count.toLocaleString()} />
+            <DatasetFact label="Format" value={dataset.data_format} />
+            <DatasetFact
+              label="Quality"
+              value={`${dataset.quality_score}/100 · ${dataset.quality_label}`}
+              valueClassName={qualityMetaClass(dataset.quality_score)}
+            />
+            <DatasetFact label="Registered" value={formatDate(dataset.registration_date)} />
+            <DatasetFact label="Updated" value={formatDate(dataset.last_updated_date)} />
+          </div>
         </div>
 
-        <div className="dataset-overview-right">
-          <span className="doc-label">Schema</span>
+        <aside className="dataset-schema-panel">
+          <div className="dataset-schema-head">
+            <span className="doc-label">Schema</span>
+            <span>{dataset.schema_profile.length} fields</span>
+          </div>
           <div className="schema-field-list">
             {dataset.schema_profile.map((field) => (
               <div className="schema-field-row" key={field.field_name}>
@@ -141,12 +134,43 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
               </div>
             ))}
           </div>
-        </div>
+        </aside>
       </div>
 
-      {/* Tabs: Sample Records | Source & Lineage | Quality & Metrics */}
       <DatasetTabs dataset={dataset} />
     </section>
+  );
+}
+
+function DatasetFact({
+  label,
+  value,
+  mono = false,
+  strong = false,
+  wide = false,
+  valueClassName = "",
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  strong?: boolean;
+  wide?: boolean;
+  valueClassName?: string;
+}) {
+  const classes = [
+    "dataset-fact",
+    wide ? "dataset-fact--wide" : "",
+    mono ? "dataset-fact--mono" : "",
+    strong ? "dataset-fact--strong" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return (
+    <div className={classes}>
+      <span>{label}</span>
+      <strong className={valueClassName}>{value}</strong>
+    </div>
   );
 }
 
@@ -154,6 +178,10 @@ function qualityMetaClass(score: number) {
   if (score >= 90) return "meta-quality good";
   if (score >= 60) return "meta-quality warn";
   return "meta-quality bad";
+}
+
+function isExternalUrl(value: string) {
+  return value.startsWith("http://") || value.startsWith("https://");
 }
 
 function formatBytes(bytes: number) {

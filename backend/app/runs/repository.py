@@ -343,6 +343,7 @@ class RunRepository:
         )
         return {
             **row,
+            "metric_summary": metric_summary,
             "health_summary": health_summary,
             "checkpoint_count": len(checkpoints),
             "model_version_status": model_version_status,
