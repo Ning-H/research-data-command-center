@@ -99,6 +99,7 @@ class ExperimentRepository:
                     "edit_variants",
                     "attach_dataset_versions",
                     "attach_training_runs",
+                    "accept_dataset_handoff",
                     "append_note",
                 ],
             },

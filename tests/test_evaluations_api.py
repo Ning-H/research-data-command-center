@@ -11,7 +11,9 @@ from app.datasets.api import get_dataset_repository, get_dataset_storage_root
 from app.datasets.repository import DatasetRepository
 from app.evaluations.api import get_evaluation_repository, get_evaluation_storage_root
 from app.evaluations.repository import EvaluationRepository
+from app.experiments.api import get_experiment_repository, get_experiment_storage_root
 from app.experiments.lifecycle import register_experiment
+from app.experiments.repository import ExperimentRepository
 from app.main import app
 from app.models.api import get_model_repository, get_model_storage_root
 from app.models.lifecycle import register_model_duckdb_views
@@ -72,6 +74,9 @@ def test_eval_run_failures_can_be_saved_as_dataset_candidates(tmp_path: Path) ->
     def override_evaluation_repository() -> EvaluationRepository:
         return EvaluationRepository(duckdb_path=duckdb_path, storage_root=tmp_path)
 
+    def override_experiment_repository() -> ExperimentRepository:
+        return ExperimentRepository(duckdb_path=duckdb_path, storage_root=tmp_path)
+
     def override_candidate_repository() -> DatasetCandidateRepository:
         return DatasetCandidateRepository(duckdb_path=duckdb_path, storage_root=tmp_path)
 
@@ -84,6 +89,8 @@ def test_eval_run_failures_can_be_saved_as_dataset_candidates(tmp_path: Path) ->
     app.dependency_overrides[get_model_storage_root] = lambda: tmp_path
     app.dependency_overrides[get_evaluation_repository] = override_evaluation_repository
     app.dependency_overrides[get_evaluation_storage_root] = lambda: tmp_path
+    app.dependency_overrides[get_experiment_repository] = override_experiment_repository
+    app.dependency_overrides[get_experiment_storage_root] = lambda: tmp_path
     app.dependency_overrides[get_dataset_candidate_repository] = override_candidate_repository
     app.dependency_overrides[get_dataset_candidate_storage_root] = lambda: tmp_path
     app.dependency_overrides[get_dataset_repository] = override_dataset_repository
@@ -327,6 +334,30 @@ def test_eval_run_failures_can_be_saved_as_dataset_candidates(tmp_path: Path) ->
         assert handoff["recommended_next_experiment"]["linked_datasets"] == [
             {"dataset_id": 1, "dataset_version_id": 2}
         ]
+
+        accepted_handoff = client.post(
+            "/experiments/1/dataset-handoffs",
+            json={
+                "dataset_id": 1,
+                "dataset_version_id": 2,
+                "updated_by_user_id": "Lena Keys",
+            },
+        ).json()
+        assert accepted_handoff["accepted_dataset"] == {"dataset_id": 1, "dataset_version_id": 2}
+        assert accepted_handoff["handoff"]["failure_summary"]["candidate_count"] == 1
+        assert accepted_handoff["next_actions"] == [
+            "launch_training_run_with_linked_dataset_version",
+            "register_checkpoint_as_model_version",
+            "rerun_source_eval_suite",
+            "compare_new_model_to_source_model_versions",
+        ]
+        assert accepted_handoff["experiment"]["linked_datasets"] == [
+            {"dataset_id": 1, "dataset_version_id": 1},
+            {"dataset_id": 1, "dataset_version_id": 2},
+        ]
+        assert accepted_handoff["experiment"]["notes"][-1]["body"].startswith(
+            "Accepted failure-replay dataset version 1.2"
+        )
 
         included_iterations = client.get(
             "/dataset-iterations",

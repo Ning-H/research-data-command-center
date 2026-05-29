@@ -6,7 +6,13 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import settings
-from app.experiments.lifecycle import append_experiment_note, register_experiment, update_experiment
+from app.datasets.repository import DatasetRepository
+from app.experiments.lifecycle import (
+    append_experiment_note,
+    attach_experiment_links,
+    register_experiment,
+    update_experiment,
+)
 from app.experiments.repository import ExperimentRepository
 
 router = APIRouter(prefix="/experiments", tags=["experiments"])
@@ -120,4 +126,89 @@ def append_note(
         "notes": result.notes,
         "updated_at": result.updated_at,
         "experiment": experiment,
+    }
+
+
+@router.post("/{experiment_id}/dataset-handoffs")
+def accept_dataset_handoff(
+    experiment_id: int,
+    payload: dict[str, Any],
+    storage_root: Annotated[Path, Depends(get_experiment_storage_root)],
+    repository: Annotated[ExperimentRepository, Depends(get_experiment_repository)],
+) -> dict[str, Any]:
+    try:
+        dataset_id = int(payload["dataset_id"])
+        dataset_version_id = int(payload["dataset_version_id"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="dataset_id and dataset_version_id are required",
+        ) from exc
+
+    dataset_repository = DatasetRepository(
+        duckdb_path=repository.duckdb_path,
+        storage_root=storage_root,
+    )
+    handoff = dataset_repository.get_experiment_handoff(
+        dataset_id=str(dataset_id),
+        dataset_version_id=str(dataset_version_id),
+    )
+    if handoff is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Dataset version not found: dataset_id={dataset_id}, dataset_version_id={dataset_version_id}",
+        )
+
+    recommended_experiment_id = int(
+        handoff["recommended_next_experiment"].get("experiment_id") or 0
+    )
+    if recommended_experiment_id and recommended_experiment_id != experiment_id:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "dataset handoff belongs to "
+                f"experiment_id={recommended_experiment_id}, not experiment_id={experiment_id}"
+            ),
+        )
+
+    actor = str(payload.get("updated_by_user_id") or payload.get("author_name") or "user_demo_owner")
+    dataset_ref = {"dataset_id": dataset_id, "dataset_version_id": dataset_version_id}
+    try:
+        attach_experiment_links(
+            storage_root=storage_root,
+            experiment_id=experiment_id,
+            linked_datasets=[dataset_ref],
+            updated_by_user_id=actor,
+        )
+        note_result = append_experiment_note(
+            storage_root=storage_root,
+            experiment_id=experiment_id,
+            payload={
+                "body": payload.get("note")
+                or (
+                    "Accepted failure-replay dataset version "
+                    f"{dataset_id}.{dataset_version_id} for the next experiment iteration."
+                ),
+                "author_name": actor,
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    experiment = repository.get_experiment(experiment_id)
+    if experiment is None:
+        raise HTTPException(status_code=404, detail=f"Experiment not found: {experiment_id}")
+
+    return {
+        "experiment_id": experiment_id,
+        "accepted_dataset": dataset_ref,
+        "note_id": note_result.note_id,
+        "experiment": experiment,
+        "handoff": handoff,
+        "next_actions": [
+            "launch_training_run_with_linked_dataset_version",
+            "register_checkpoint_as_model_version",
+            "rerun_source_eval_suite",
+            "compare_new_model_to_source_model_versions",
+        ],
     }
