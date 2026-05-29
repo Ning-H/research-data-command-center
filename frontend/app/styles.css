@@ -656,6 +656,33 @@ tbody tr:hover td {
   resize: vertical;
 }
 
+.field .field-hint {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.register-tabs {
+  display: grid;
+  gap: 16px;
+}
+
+.tab-row {
+  display: flex;
+  gap: 8px;
+}
+
+.raw-badge {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.raw-asset-heading {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
 .table-copy {
   color: #34282B;
   font-size: 13px;

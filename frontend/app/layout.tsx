@@ -21,7 +21,7 @@ import "./styles.css";
 const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/research-programs", label: "Research Programs", icon: BrainCircuit },
-  { href: "/data-assets", label: "Data Assets", icon: Database },
+  { href: "/datasets", label: "Data Assets", icon: Database },
   { href: "/experiments", label: "Experiments", icon: FlaskConical },
   { href: "/training-runs", label: "Training Runs", icon: LineChart },
   { href: "/models-checkpoints", label: "Models & Checkpoints", icon: Boxes },

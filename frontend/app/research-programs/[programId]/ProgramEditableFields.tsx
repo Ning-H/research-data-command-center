@@ -102,7 +102,7 @@ export default function ProgramEditableFields({
             <strong>{linkedExperiments}</strong>
             <span>Experiments</span>
           </Link>
-          <Link className="activity-chip" href="/data-assets">
+          <Link className="activity-chip" href="/datasets">
             <strong>{linkedDatasets}</strong>
             <span>Datasets</span>
           </Link>

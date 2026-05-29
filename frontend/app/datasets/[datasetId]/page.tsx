@@ -16,6 +16,68 @@ export default async function DatasetDetailPage({ params }: DatasetDetailPagePro
     notFound();
   }
 
+  if (dataset.asset_kind === "raw") {
+    return (
+      <section className="page dataset-detail-page">
+        <nav className="breadcrumb">
+          <Link href="/datasets">Datasets</Link>
+          <span className="breadcrumb-sep" aria-hidden="true">/</span>
+          <span>{dataset.name}</span>
+        </nav>
+
+        <div className="dataset-overview-left">
+          <div className="raw-asset-heading">
+            <span className="badge neutral raw-badge">RAW</span>
+            <p className="subtle">
+              This asset is stored as-is in object storage. It has not been parsed, profiled, or
+              quality-scored.
+            </p>
+          </div>
+          <dl className="dataset-props">
+            <div className="dataset-prop-row">
+              <dt>Name</dt>
+              <dd className="dataset-prop-name">{dataset.name}</dd>
+            </div>
+            <div className="dataset-prop-row">
+              <dt>Version</dt>
+              <dd>v{dataset.dataset_version_id}</dd>
+            </div>
+            <div className="dataset-prop-row">
+              <dt>File</dt>
+              <dd className="mono">{dataset.original_filename}</dd>
+            </div>
+            <div className="dataset-prop-row">
+              <dt>Size</dt>
+              <dd>{formatBytes(dataset.file_size_bytes)}</dd>
+            </div>
+            <div className="dataset-prop-row">
+              <dt>Type</dt>
+              <dd>{dataset.content_type || dataset.data_format}</dd>
+            </div>
+            <div className="dataset-prop-row">
+              <dt>Source</dt>
+              <dd>{dataset.source_label}</dd>
+            </div>
+            {dataset.description && (
+              <div className="dataset-prop-row">
+                <dt>Description</dt>
+                <dd className="dataset-prop-desc">{dataset.description}</dd>
+              </div>
+            )}
+            <div className="dataset-prop-row">
+              <dt>Object URI</dt>
+              <dd className="mono dataset-prop-desc">{dataset.raw_object_uri}</dd>
+            </div>
+            <div className="dataset-prop-row">
+              <dt>Registered</dt>
+              <dd>{formatDate(dataset.registration_date)}</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="page dataset-detail-page">
       <nav className="breadcrumb">
@@ -92,6 +154,18 @@ function qualityMetaClass(score: number) {
   if (score >= 90) return "meta-quality good";
   if (score >= 60) return "meta-quality warn";
   return "meta-quality bad";
+}
+
+function formatBytes(bytes: number) {
+  if (!bytes) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value >= 10 || unit === 0 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
 }
 
 function formatDate(value: string) {

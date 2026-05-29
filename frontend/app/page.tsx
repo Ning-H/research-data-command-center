@@ -66,7 +66,7 @@ export default async function HomePage() {
           Group hypotheses, experiments, data mixtures, model behavior changes, and next actions.
         </LifecycleCard>
         <LifecycleCard
-          href="/data-assets"
+          href="/datasets"
           icon={<Database aria-hidden="true" className="accent-icon" size={22} />}
           title="Data Assets"
         >

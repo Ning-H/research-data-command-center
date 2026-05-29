@@ -20,6 +20,11 @@ export type DatasetSummary = {
   registration_date: string;
   last_updated_date: string;
   created_at: string;
+  asset_kind: "structured" | "raw";
+  original_filename: string;
+  file_size_bytes: number;
+  content_type: string;
+  raw_object_uri: string;
 };
 
 export type QualityMetric = {
@@ -555,6 +560,34 @@ export async function listDatasets(): Promise<DatasetSummary[]> {
 
 export async function getDataset(datasetId: string): Promise<DatasetDetail> {
   return getJson<DatasetDetail>(`/datasets/${datasetId}`);
+}
+
+export type RegisterDatasetPayload = {
+  name: string;
+  task_type: string;
+  records: Array<Record<string, unknown>>;
+  description?: string;
+  data_purpose?: string;
+  category?: string;
+  source_dataset_name?: string;
+  source_url?: string;
+  source_label?: string;
+};
+
+export async function registerDataset(payload: RegisterDatasetPayload): Promise<DatasetDetail> {
+  return postJson<DatasetDetail>("/datasets/register", payload);
+}
+
+export async function registerRawDataset(formData: FormData): Promise<DatasetDetail> {
+  const response = await fetch(`${API_BASE_URL}/datasets/register-raw`, {
+    body: formData,
+    cache: "no-store",
+    method: "POST",
+  });
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<DatasetDetail>;
 }
 
 export async function listRuns(): Promise<RunSummary[]> {

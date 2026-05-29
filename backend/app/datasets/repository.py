@@ -740,6 +740,7 @@ def _dataset_summary_from_row(row: dict[str, Any], storage_root: Path) -> dict[s
         manifest.get("public_dataset_version_id")
         or _display_version_id_for_storage_version_id(row["dataset_version_id"])
     )
+    is_raw = manifest.get("asset_kind") == "raw"
     quality_score = _quality_score_from_values(
         records_total=float(row["records_total"] or row["record_count"] or 0),
         required_empty_count=float(row["required_empty_count"] or 0),
@@ -747,7 +748,7 @@ def _dataset_summary_from_row(row: dict[str, Any], storage_root: Path) -> dict[s
         pii_match_count=float(row["pii_match_count"] or 0),
         profile_available=True,
     )
-    return {
+    summary = {
         "dataset_id": dataset_id or _dataset_display_id(row["source_dataset_name"]),
         "dataset_version_id": dataset_version_id,
         "name": manifest.get("display_name") or _display_name(row["source_dataset_name"]),
@@ -768,7 +769,22 @@ def _dataset_summary_from_row(row: dict[str, Any], storage_root: Path) -> dict[s
         "quality_score": quality_score,
         "quality_label": _quality_label(quality_score),
         "category": manifest.get("category") or _category_for_task(row["task_type"]),
+        "asset_kind": "raw" if is_raw else "structured",
+        "original_filename": str(manifest.get("original_filename") or ""),
+        "file_size_bytes": int(manifest.get("file_size_bytes") or 0),
+        "content_type": str(manifest.get("content_type") or ""),
+        "raw_object_uri": str(manifest.get("raw_object_uri") or ""),
     }
+    if is_raw:
+        summary.update(
+            {
+                "record_count": 0,
+                "quality_status": "raw",
+                "quality_score": 0,
+                "quality_label": "Unprocessed",
+            }
+        )
+    return summary
 
 
 def _read_dataset_manifest(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
 from app.config import settings
 from app.datasets.lifecycle import (
@@ -15,6 +15,7 @@ from app.datasets.lifecycle import (
     overwrite_dataset_draft_records,
     publish_dataset_draft,
     register_dataset,
+    register_raw_dataset,
     validate_dataset_draft,
 )
 from app.datasets.repository import DatasetRepository
@@ -25,7 +26,10 @@ jobs_router = APIRouter(prefix="/dataset-ingestion-jobs", tags=["datasets"])
 
 
 def get_dataset_repository() -> DatasetRepository:
-    return DatasetRepository(duckdb_path=Path(settings.duckdb_path), storage_root=Path("."))
+    return DatasetRepository(
+        duckdb_path=Path(settings.duckdb_path),
+        storage_root=Path(settings.raw_storage_root).parent,
+    )
 
 
 def get_dataset_storage_root() -> Path:
@@ -95,6 +99,37 @@ def register_dataset_endpoint(
 ) -> dict[str, Any]:
     try:
         return register_dataset(storage_root=storage_root, payload=payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/register-raw")
+async def register_raw_dataset_endpoint(
+    storage_root: Annotated[Path, Depends(get_dataset_storage_root)],
+    file: Annotated[UploadFile, File()],
+    name: Annotated[str, Form()],
+    source_label: Annotated[str, Form()] = "SYNTHETIC_REALISTIC",
+    description: Annotated[str, Form()] = "",
+    data_purpose: Annotated[str, Form()] = "",
+    category: Annotated[str, Form()] = "",
+    task_type: Annotated[str, Form()] = "",
+) -> dict[str, Any]:
+    data = await file.read()
+    try:
+        return register_raw_dataset(
+            storage_root=storage_root,
+            data=data,
+            filename=file.filename or "upload.bin",
+            content_type=file.content_type,
+            payload={
+                "name": name,
+                "source_label": source_label,
+                "description": description,
+                "data_purpose": data_purpose,
+                "category": category,
+                "task_type": task_type,
+            },
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

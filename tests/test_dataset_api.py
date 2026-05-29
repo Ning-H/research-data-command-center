@@ -378,3 +378,75 @@ def test_dataset_api_filters_catalog_and_searches_records(tmp_path: Path) -> Non
         assert records[0]["source_row_id"] == "s1"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_register_raw_dataset_api(tmp_path: Path) -> None:
+    # Seed a normal dataset so the catalog (and all analytical parquet tables) exist,
+    # mirroring how raw uploads happen against an already-populated catalog.
+    ingest_dolly_records(
+        storage_root=tmp_path,
+        source_records=[
+            {
+                "instruction": "Seed example",
+                "context": "Seed context.",
+                "response": "Seed response.",
+                "category": "open_qa",
+            }
+        ],
+    )
+
+    def override_repository() -> DatasetRepository:
+        return DatasetRepository(
+            duckdb_path=tmp_path / "duckdb" / "research_command_center.duckdb",
+            storage_root=tmp_path,
+        )
+
+    app.dependency_overrides[get_dataset_repository] = override_repository
+    app.dependency_overrides[get_dataset_storage_root] = lambda: tmp_path
+    try:
+        client = TestClient(app)
+        raw_bytes = b"PAR1\x00\x01\x02 arbitrary bytes \xff\xfe"
+        register_response = client.post(
+            "/datasets/register-raw",
+            files={"file": ("snapshot.parquet", raw_bytes, "application/octet-stream")},
+            data={
+                "name": "Raw Crawl Snapshot",
+                "source_label": "PUBLIC_REAL",
+                "description": "Stored as-is without parsing.",
+                "category": "Raw blob",
+            },
+        )
+        assert register_response.status_code == 200
+        registered = register_response.json()
+        assert registered["dataset_id"] == 9
+        assert registered["dataset_version_id"] == 1
+        assert registered["asset_kind"] == "raw"
+        assert registered["original_filename"] == "snapshot.parquet"
+        assert registered["file_size_bytes"] == len(raw_bytes)
+        assert registered["record_count"] == 0
+        assert registered["quality_label"] == "Unprocessed"
+
+        # The raw bytes are stored verbatim in object storage.
+        stored = Path(registered["raw_object_uri"])
+        assert stored.read_bytes() == raw_bytes
+
+        # The raw asset shows up in the catalog flagged as raw.
+        catalog_response = client.get("/datasets?limit=200")
+        assert catalog_response.status_code == 200
+        catalog = catalog_response.json()["items"]
+        raw_items = [item for item in catalog if item["asset_kind"] == "raw"]
+        assert len(raw_items) == 1
+        assert raw_items[0]["dataset_id"] == 9
+
+        detail_response = client.get("/datasets/9")
+        assert detail_response.status_code == 200
+        assert detail_response.json()["asset_kind"] == "raw"
+
+        empty_response = client.post(
+            "/datasets/register-raw",
+            files={"file": ("empty.bin", b"", "application/octet-stream")},
+            data={"name": "Empty Upload"},
+        )
+        assert empty_response.status_code == 400
+    finally:
+        app.dependency_overrides.clear()

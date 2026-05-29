@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -17,9 +18,11 @@ from app.datasets.pipeline import (
     build_record_id,
     clean_text,
     content_hash_for_fields,
+    register_duckdb_views,
     utc_now_iso,
     write_dataset_outputs,
     write_raw_jsonl,
+    _write_parquet,
 )
 from app.datasets.repository import (
     DatasetRepository,
@@ -62,6 +65,140 @@ def register_dataset(
         parent_dataset_version_id="",
         records=records,
     )
+
+
+def register_raw_dataset(
+    storage_root: Path,
+    *,
+    data: bytes,
+    filename: str,
+    content_type: str | None,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    if not data:
+        raise ValueError("uploaded file is empty")
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        raise ValueError("name is required")
+
+    public_dataset_id = _next_dataset_id(storage_root)
+    public_dataset_version_id = 1
+    storage_dataset_id = f"ds_dataset_{public_dataset_id}"
+    storage_dataset_version_id = _storage_dataset_version_id(public_dataset_id, public_dataset_version_id)
+    created_at = utc_now_iso()
+    source_label = _source_label(payload)
+
+    safe_filename = _safe_filename(filename)
+    checksum = hashlib.sha256(data).hexdigest()
+    raw_path = (
+        storage_root
+        / "object_store"
+        / "datasets"
+        / storage_dataset_id
+        / "versions"
+        / storage_dataset_version_id
+        / "raw"
+        / safe_filename
+    )
+    raw_path.parent.mkdir(parents=True, exist_ok=True)
+    raw_path.write_bytes(data)
+
+    task_type = str(payload.get("task_type") or "raw_upload").strip()
+    metadata = {
+        "asset_kind": "raw",
+        "original_filename": safe_filename,
+        "file_size_bytes": len(data),
+        "content_type": content_type or "application/octet-stream",
+        "checksum_sha256": checksum,
+        "raw_object_uri": str(raw_path),
+    }
+    placeholder_record = {
+        "record_id": build_record_id(storage_dataset_version_id, "raw", "raw", checksum),
+        "dataset_id": storage_dataset_id,
+        "dataset_version_id": storage_dataset_version_id,
+        "source_dataset_name": name,
+        "source_split": "raw",
+        "source_row_id": "raw",
+        "category": str(payload.get("category") or "Raw upload"),
+        "task_type": task_type,
+        "input_text": "",
+        "instruction": "",
+        "context": "",
+        "question": "",
+        "chosen_text": "",
+        "rejected_text": "",
+        "target_text": "",
+        "response_text": "",
+        "prompt_messages_json": json.dumps([], ensure_ascii=True),
+        "metadata_json": json.dumps(metadata, sort_keys=True, ensure_ascii=True),
+        "content_hash": checksum,
+        "source_label": source_label,
+        "created_at": created_at,
+    }
+    records_path = (
+        storage_root
+        / "parquet"
+        / "dataset_records"
+        / f"dataset_id={storage_dataset_id}"
+        / f"dataset_version_id={storage_dataset_version_id}"
+        / "split=raw"
+        / "records.parquet"
+    )
+    _write_parquet([placeholder_record], records_path)
+
+    manifest_path = raw_path.parent.parent / "manifest.json"
+    manifest = {
+        "public_dataset_id": public_dataset_id,
+        "public_dataset_version_id": public_dataset_version_id,
+        "dataset_id": storage_dataset_id,
+        "dataset_version_id": storage_dataset_version_id,
+        "display_name": name,
+        "description": str(payload.get("description") or ""),
+        "category": str(payload.get("category") or "Raw upload"),
+        "task_type": task_type,
+        "data_purpose": str(payload.get("data_purpose") or "Raw uploaded data asset stored without processing."),
+        "data_format": _format_label(safe_filename, content_type),
+        "query_engine": "Object store",
+        "source_url": str(raw_path),
+        "source_priority": source_label,
+        "parent_dataset_version_id": "",
+        "created_by_user_id": str(payload.get("created_by_user_id") or DEFAULT_CREATED_BY_USER_ID),
+        "version_notes": str(payload.get("version_notes") or ""),
+        "asset_kind": "raw",
+        "original_filename": safe_filename,
+        "file_size_bytes": len(data),
+        "content_type": content_type or "application/octet-stream",
+        "checksum_sha256": checksum,
+        "raw_object_uri": str(raw_path),
+    }
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
+
+    duckdb_path = storage_root / "duckdb" / "research_command_center.duckdb"
+    register_duckdb_views(storage_root=storage_root, duckdb_path=duckdb_path)
+
+    detail = _repository(storage_root).get_dataset_version(
+        str(public_dataset_id),
+        str(public_dataset_version_id),
+    )
+    if detail is None:
+        raise ValueError("raw dataset was written but could not be read back")
+    return {**detail, "raw_uri": str(raw_path)}
+
+
+def _safe_filename(filename: str) -> str:
+    base = Path(filename or "").name.strip() or "upload.bin"
+    cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", base)
+    return cleaned or "upload.bin"
+
+
+def _format_label(filename: str, content_type: str | None) -> str:
+    suffix = Path(filename).suffix.lstrip(".").upper()
+    if suffix:
+        return suffix
+    if content_type:
+        return content_type
+    return "RAW"
 
 
 def create_dataset_version(
