@@ -100,9 +100,74 @@ class ExperimentRepository:
                     "attach_dataset_versions",
                     "attach_training_runs",
                     "accept_dataset_handoff",
+                    "view_next_run_plan",
                     "append_note",
                 ],
             },
+        }
+
+    def get_next_run_plan(self, experiment_id: int) -> dict[str, Any] | None:
+        experiment = self.get_experiment(experiment_id)
+        if experiment is None:
+            return None
+
+        linked_datasets = experiment.get("linked_datasets", [])
+        selected_dataset = _latest_dataset_ref(linked_datasets)
+        can_register_run = selected_dataset is not None
+        blocking_reasons = [] if can_register_run else ["experiment has no linked dataset version"]
+        run_name = _next_run_name(experiment, selected_dataset)
+        dataset_id = int(selected_dataset.get("dataset_id") or 0) if selected_dataset else 0
+        dataset_version_id = (
+            int(selected_dataset.get("dataset_version_id") or 0) if selected_dataset else 0
+        )
+
+        return {
+            "experiment_id": int(experiment["experiment_id"]),
+            "program_id": int(experiment["program_id"]),
+            "experiment_name": experiment["experiment_name"],
+            "can_register_run": can_register_run,
+            "blocking_reasons": blocking_reasons,
+            "selected_dataset": selected_dataset,
+            "run_registration_payload": {
+                "run_name": run_name,
+                "program_id": int(experiment["program_id"]),
+                "experiment_id": int(experiment["experiment_id"]),
+                "dataset_id": dataset_id,
+                "dataset_version_id": dataset_version_id,
+                "base_model_name": "",
+                "training_task": experiment.get("experiment_type") or "failure_replay_training",
+                "research_intent": (
+                    "Train the next candidate using the accepted dataset version, then compare "
+                    "against the source evaluation rubric before promotion."
+                ),
+                "owner_user_id": experiment.get("owner_name") or "user_demo_owner",
+                "training_environment": "researcher_managed",
+                "artifact_root_uri": (
+                    "storage/object_store/runs/"
+                    f"experiment_id={int(experiment['experiment_id'])}/{run_name}"
+                ),
+                "run_config": {
+                    "dataset_ref": selected_dataset or {},
+                    "evaluation_plan": experiment.get("evaluation_plan") or "",
+                    "source": "experiment_next_run_plan",
+                },
+            },
+            "evaluation_requirement": {
+                "summary": (
+                    "Run the same eval suite and rubric metrics used by the source model versions "
+                    "before promoting a new checkpoint."
+                ),
+                "compare_against": "source_model_versions_from_dataset_handoff",
+            },
+            "next_actions": [
+                "POST /runs/register",
+                "POST /runs/{run_id}/events",
+                "POST /runs/{run_id}/checkpoints",
+                "POST /runs/{run_id}/complete",
+                "POST /models/register-from-checkpoint",
+                "POST /eval-runs",
+                "POST /models/compare",
+            ],
         }
 
     def _has_table(self, table_name: str) -> bool:
@@ -147,6 +212,30 @@ def _json_list(value: Any) -> list[Any]:
     if isinstance(value, list):
         return value
     return list(json.loads(str(value)))
+
+
+def _latest_dataset_ref(linked_datasets: list[Any]) -> dict[str, int] | None:
+    refs = [
+        {
+            "dataset_id": int(item.get("dataset_id") or 0),
+            "dataset_version_id": int(item.get("dataset_version_id") or 0),
+        }
+        for item in linked_datasets
+        if isinstance(item, dict)
+    ]
+    refs = [ref for ref in refs if ref["dataset_id"] and ref["dataset_version_id"]]
+    if not refs:
+        return None
+    return max(refs, key=lambda ref: (ref["dataset_id"], ref["dataset_version_id"]))
+
+
+def _next_run_name(experiment: dict[str, Any], dataset_ref: dict[str, int] | None) -> str:
+    name = str(experiment.get("experiment_name") or f"experiment-{experiment['experiment_id']}")
+    slug = "-".join(name.lower().split())
+    slug = "".join(character for character in slug if character.isalnum() or character == "-")
+    if dataset_ref is None:
+        return f"{slug}-next-run"
+    return f"{slug}-dataset-v{dataset_ref['dataset_version_id']}"
 
 
 def _experiment_search_text(experiment: dict[str, Any]) -> str:

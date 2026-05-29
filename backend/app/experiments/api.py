@@ -85,6 +85,17 @@ def get_experiment(
     return experiment
 
 
+@router.get("/{experiment_id}/next-run-plan")
+def get_next_run_plan(
+    experiment_id: int,
+    repository: Annotated[ExperimentRepository, Depends(get_experiment_repository)],
+) -> dict[str, Any]:
+    plan = repository.get_next_run_plan(experiment_id)
+    if plan is None:
+        raise HTTPException(status_code=404, detail=f"Experiment not found: {experiment_id}")
+    return plan
+
+
 @router.patch("/{experiment_id}")
 def patch_experiment(
     experiment_id: int,

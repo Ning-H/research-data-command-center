@@ -359,6 +359,16 @@ def test_eval_run_failures_can_be_saved_as_dataset_candidates(tmp_path: Path) ->
             "Accepted failure-replay dataset version 1.2"
         )
 
+        next_run_plan = client.get("/experiments/1/next-run-plan").json()
+        assert next_run_plan["can_register_run"] is True
+        assert next_run_plan["selected_dataset"] == {"dataset_id": 1, "dataset_version_id": 2}
+        assert next_run_plan["run_registration_payload"]["experiment_id"] == 1
+        assert next_run_plan["run_registration_payload"]["dataset_version_id"] == 2
+        assert next_run_plan["run_registration_payload"]["run_config"]["source"] == (
+            "experiment_next_run_plan"
+        )
+        assert next_run_plan["next_actions"][0] == "POST /runs/register"
+
         included_iterations = client.get(
             "/dataset-iterations",
             params={"experiment_id": 1, "target_dataset_id": 1, "status": "approved"},
