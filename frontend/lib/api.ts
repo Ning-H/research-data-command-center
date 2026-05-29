@@ -240,6 +240,165 @@ export type RegisterModelResponse = {
   artifact_uri: string;
 };
 
+export type EvalMetricSummary = {
+  metric_name: string;
+  mean: number;
+  min: number;
+  max: number;
+  best_eval_run_id: number;
+  best_model_version_id: number;
+};
+
+export type EvalRunSummary = {
+  eval_run_id: number;
+  eval_suite_id: number;
+  program_id: number;
+  experiment_id: number;
+  model_version_id: number;
+  dataset_id: number;
+  dataset_version_id: number;
+  checkpoint_id: number;
+  run_id: number;
+  status: string;
+  started_at: string;
+  ended_at: string;
+  source_priority: string;
+  model_name?: string;
+  model_version_name?: string;
+  output_count: number;
+  failure_count: number;
+  failure_types: Record<string, number>;
+  score_summary: Record<string, { mean: number; min: number; max: number }>;
+  lineage_summary: {
+    dataset_id: number;
+    dataset_version_id: number;
+    run_id: number;
+    checkpoint_id: number;
+    model_version_id: number;
+    eval_run_id: number;
+  };
+};
+
+export type EvaluationSummary = {
+  filters: Record<string, number | null>;
+  eval_run_count: number;
+  model_version_count: number;
+  output_count: number;
+  failure_count: number;
+  metric_summary: EvalMetricSummary[];
+  runs: EvalRunSummary[];
+};
+
+export type FailureCountBucket = {
+  value: string;
+  count: number;
+};
+
+export type FailureLibrarySummary = {
+  filters: Record<string, number | null>;
+  failure_count: number;
+  by_failure_type: FailureCountBucket[];
+  by_severity: FailureCountBucket[];
+  by_status: FailureCountBucket[];
+};
+
+export type EvalFailure = {
+  eval_failure_id: number;
+  eval_run_id: number;
+  eval_output_id: number;
+  eval_case_id: number;
+  model_version_id: number;
+  dataset_id: number;
+  dataset_version_id: number;
+  program_id: number;
+  experiment_id: number;
+  checkpoint_id: number;
+  run_id: number;
+  failure_type: string;
+  severity: string;
+  status: string;
+  failure_reason: string;
+  prompt_text: string;
+  output_text: string;
+  score: number;
+  case_name: string;
+  model_name?: string;
+  model_version_name?: string;
+  dataset_candidate_count: number;
+  created_at: string;
+};
+
+export type EvalFailureDetail = EvalFailure & {
+  scores: Record<string, number>;
+  expected_topics: string[];
+  required_sections: string[];
+  lineage: Array<{
+    lineage_step: string;
+    source_type: string;
+    source_id: number;
+    target_type: string;
+    target_id: number;
+  }>;
+  dataset_candidates: DatasetCandidate[];
+};
+
+export type DatasetCandidate = {
+  dataset_candidate_id: number;
+  eval_failure_id: number;
+  source_eval_run_id: number;
+  source_eval_output_id: number;
+  source_model_version_id: number;
+  program_id: number;
+  experiment_id: number;
+  target_dataset_id: number;
+  failure_type: string;
+  status: string;
+  proposed_input_text: string;
+  proposed_target_text: string;
+  review_notes: string;
+  source_priority: string;
+  created_at: string;
+  created_by_user_id: string;
+  reviewed_at: string;
+  reviewed_by_user_id: string;
+  included_dataset_id: number;
+  included_dataset_version_id: number;
+  included_at: string;
+};
+
+export type DatasetIteration = {
+  target_dataset_id: number;
+  status: string;
+  failure_type: string;
+  source_model_version_id: number;
+  candidate_count: number;
+  included_count: number;
+  first_created_at: string;
+  last_created_at: string;
+};
+
+export type CreateDatasetCandidatePayload = {
+  target_dataset_id: number;
+  proposed_input_text: string;
+  proposed_target_text: string;
+  created_by_user_id?: string;
+};
+
+export type DatasetVersionFromCandidatesResponse = {
+  dataset_version: {
+    dataset_id: number;
+    dataset_version_id: number;
+    status: string;
+    name?: string;
+    version?: string;
+  };
+  candidate_count: number;
+  included_candidate_ids: number[];
+  iteration_manifest: {
+    parent_dataset_version_id: number;
+  };
+};
+
 export type RunLineageEdge = {
   lineage_step: string;
   source_type: string;
@@ -429,6 +588,92 @@ export async function getModel(modelVersionId: string): Promise<ModelVersionDeta
 
 export async function registerModelFromCheckpoint(payload: RegisterModelPayload): Promise<RegisterModelResponse> {
   return postJson<RegisterModelResponse>("/models/register-from-checkpoint", payload);
+}
+
+export async function getEvaluationSummary(
+  params: Record<string, string | number | undefined> = {},
+): Promise<EvaluationSummary> {
+  const suffix = querySuffix(params);
+  return getJson<EvaluationSummary>(`/evaluations/summary${suffix}`);
+}
+
+export async function listEvalRuns(
+  params: Record<string, string | number | undefined> = {},
+): Promise<EvalRunSummary[]> {
+  const suffix = querySuffix(params);
+  const payload = await getJson<{ items: EvalRunSummary[] }>(`/eval-runs${suffix}`);
+  return payload.items;
+}
+
+export async function getFailureLibrarySummary(
+  params: Record<string, string | number | undefined> = {},
+): Promise<FailureLibrarySummary> {
+  const suffix = querySuffix(params);
+  return getJson<FailureLibrarySummary>(`/failure-library/summary${suffix}`);
+}
+
+export async function listFailures(
+  params: Record<string, string | number | undefined> = {},
+): Promise<EvalFailure[]> {
+  const suffix = querySuffix(params);
+  const payload = await getJson<{ items: EvalFailure[] }>(`/failure-library${suffix}`);
+  return payload.items;
+}
+
+export async function getFailure(evalFailureId: string): Promise<EvalFailureDetail> {
+  return getJson<EvalFailureDetail>(`/failure-library/${evalFailureId}`);
+}
+
+export async function createDatasetCandidateFromFailure(
+  evalFailureId: string | number,
+  payload: CreateDatasetCandidatePayload,
+): Promise<DatasetCandidate> {
+  return postJson<DatasetCandidate>(`/eval-failures/${evalFailureId}/dataset-candidate`, payload);
+}
+
+export async function listDatasetCandidates(
+  params: Record<string, string | number | undefined> = {},
+): Promise<DatasetCandidate[]> {
+  const suffix = querySuffix(params);
+  const payload = await getJson<{ items: DatasetCandidate[] }>(`/dataset-candidates${suffix}`);
+  return payload.items;
+}
+
+export async function reviewDatasetCandidate(
+  candidateId: string | number,
+  payload: { status: string; review_notes?: string; reviewed_by_user_id?: string },
+): Promise<DatasetCandidate> {
+  return patchJson<DatasetCandidate>(`/dataset-candidates/${candidateId}`, payload);
+}
+
+export async function listDatasetIterations(
+  params: Record<string, string | number | undefined> = {},
+): Promise<DatasetIteration[]> {
+  const suffix = querySuffix(params);
+  const payload = await getJson<{ items: DatasetIteration[] }>(`/dataset-iterations${suffix}`);
+  return payload.items;
+}
+
+export async function createDatasetVersionFromCandidates(
+  datasetId: string | number,
+  payload: {
+    candidate_ids?: number[];
+    candidate_status?: string;
+    version_notes?: string;
+    created_by_user_id?: string;
+  },
+): Promise<DatasetVersionFromCandidatesResponse> {
+  return postJson<DatasetVersionFromCandidatesResponse>(`/datasets/${datasetId}/versions/from-candidates`, payload);
+}
+
+function querySuffix(params: Record<string, string | number | undefined>) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  return query.toString() ? `?${query.toString()}` : "";
 }
 
 async function getJson<T>(path: string): Promise<T> {
